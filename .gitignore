@@ -41,7 +41,7 @@ user_data/
 *.log
 
 # Test data (optional - include if you want to share test images)
-# test_data/
+test_data/
 
 # Cache
 .cache/

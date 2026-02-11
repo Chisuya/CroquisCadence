@@ -23,15 +23,22 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         # Position mid-right
         self.update_idletasks()
         
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
-        
         dialog_width = 600
         dialog_height = 800
-        
-        # Position: right side with margin, vertically centered
-        x = screen_width - dialog_width - 50
-        y = (screen_height - dialog_height) // 2
+
+        parent_x = parent.winfo_x()
+        parent_y = parent.winfo_y()
+        parent_width = parent.winfo_width()
+        parent_height = parent.winfo_height()
+
+        x = parent_x + parent_width + 20
+        y = parent_y + (parent_height - dialog_height) // 2
+
+        screen_width = self.winfo_screenwidth()
+        if x + dialog_width > screen_width:
+            x = parent_x - dialog_width - 20
+            if x < 0:
+                x = (screen_width - dialog_width) // 2
         
         self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
         
@@ -759,16 +766,29 @@ class ManagePresetsDialog(ctk.CTkToplevel):
         # Mid-right screen pos
         self.update_idletasks()
         
-        # Get screen dimensions
+        dialog_width = 500
+        dialog_height = 400
+
+        parent_x = parent.winfo_x()
+        parent_y = parent.winfo_y()
+        parent_width = parent.winfo_width()
+        parent_height = parent.winfo_height()
+        
+        x = parent_x + (parent_width - dialog_width) // 2
+        y = parent_y + (parent_height - dialog_height) // 2
+        
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
         
-        dialog_width = 500
-        dialog_height = 400
-        
-        # Position: right side with margin, vertically centered
-        x = screen_width - dialog_width - 50
-        y = (screen_height - dialog_height) // 2
+        # Adjust if off screen
+        if x < 0:
+            x = 20
+        if x + dialog_width > screen_width:
+            x = screen_width - dialog_width - 20
+        if y < 0:
+            y = 20
+        if y + dialog_height > screen_height:
+            y = screen_height - dialog_height - 20
         
         self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
         

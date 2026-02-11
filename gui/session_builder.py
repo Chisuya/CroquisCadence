@@ -57,7 +57,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         
         # Colors
         self.CYBER_PINK = "#FF6EC7"
-        self.CYBER_PURPLE = "#B794F6"
+        self.CYBER_PURPLE = "#8B5CF6"
         self.CYBER_BLUE = "#67E8F9"
         self.CYBER_GREEN = "#67F971"
         self.CYBER_TEAL = "#1CBC7C"
@@ -631,6 +631,21 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         # Update Clear All button visibility
         self._update_clear_button_visibility()
     
+    def _truncate_text(self, text: str, max_length: int) -> str:
+        """
+        Truncate text to max_length, adding '...' if needed
+        
+        Args:
+            text: The string to truncate
+            max_length: Maximum length including the '...'
+        
+        Returns:
+            Truncated string
+        """
+        if len(text) <= max_length:
+            return text
+        return text[:max_length - 3] + "..."
+    
     def refresh_blocks_list(self):
         """Refresh the blocks display"""
         for widget in self.blocks_frame.winfo_children():
@@ -661,12 +676,19 @@ class SessionBuilderDialog(ctk.CTkToplevel):
 
             folder_info = ""
             if block.folder_paths:
-                # Smart truncation
-                max_display = 2  # Show max 3 folder names
-                if len(block.folder_paths) <= max_display:
-                    folder_info = f" [{', '.join(block.folder_paths)}]"
+                # Truncate individual folder names and show max amt 3
+                max_display = 3
+                max_folder_length = 10
+                
+                truncated_folders = [
+                    self._truncate_text(name, max_folder_length) 
+                    for name in block.folder_paths
+                ]
+                
+                if len(truncated_folders) <= max_display:
+                    folder_info = f" [{', '.join(truncated_folders)}]"
                 else:
-                    shown_folders = ', '.join(block.folder_paths[:max_display])
+                    shown_folders = ', '.join(truncated_folders[:max_display])
                     remaining = len(block.folder_paths) - max_display
                     folder_info = f" [{shown_folders}... +{remaining} more]"
             
@@ -956,10 +978,8 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             
             # Validate folders if they exist
             if folder_paths:
-                # Filter out folders that no longer exist
                 valid_folders = [f for f in folder_paths if f in available_folders]
                 
-                # If all folders were removed, revert to None (All Folders)
                 if len(valid_folders) == 0:
                     folder_paths = None
                 else:
@@ -1029,7 +1049,7 @@ class SavePresetDialog(ctk.CTkToplevel):
         
         # Dialog setup
         self.title("Save Preset")
-        self.geometry("450x380")
+        self.geometry("450x480")
         self.resizable(False, False)
         
         # Make it modal
@@ -1040,7 +1060,7 @@ class SavePresetDialog(ctk.CTkToplevel):
         self.update_idletasks()
         
         dialog_width = 450
-        dialog_height = 380
+        dialog_height = 480
         
         parent_x = parent.winfo_x()
         parent_y = parent.winfo_y()
@@ -1066,7 +1086,7 @@ class SavePresetDialog(ctk.CTkToplevel):
         
         # Colors
         self.CYBER_PINK = "#FF6EC7"
-        self.CYBER_PURPLE = "#B794F6"
+        self.CYBER_PURPLE = "#8B5CF6"
         self.CYBER_BLUE = "#67E8F9"
         self.CYBER_GREEN = "#67F971"
         self.CYBER_DARK = "#0f0f0f"
@@ -1280,7 +1300,7 @@ class EditFoldersDialog(ctk.CTkToplevel):
         
         # Colors
         self.CYBER_PINK = "#FF6EC7"
-        self.CYBER_PURPLE = "#B794F6"
+        self.CYBER_PURPLE = "#8B5CF6"
         self.CYBER_BLUE = "#67E8F9"
         self.CYBER_GREEN = "#67F971"
         self.CYBER_TEAL = "#1CBC7C"

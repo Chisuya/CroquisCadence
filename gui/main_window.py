@@ -12,7 +12,9 @@ from typing import Optional
 from models.session import Session, SessionBlock
 from models.image_collection import ImageCollection
 from controllers.session_controller import SessionController, SessionState
+from controllers.keyboard_shortcuts import KeyboardShortcutsManager
 from gui.session_builder import SessionBuilderDialog
+from gui.settings_dialog import SettingsDialog
 
 
 class MainWindow(ctk.CTk):
@@ -29,11 +31,15 @@ class MainWindow(ctk.CTk):
         # Initialize controllers
         self.image_collection = ImageCollection(Path("test_data/references"))
         self.session_controller = SessionController(self.image_collection)
+        self.shortcuts_manager = KeyboardShortcutsManager()
         
-        # Register callbacks
+        # Register session callbacks
         self.session_controller.on_new_block = self.handle_new_block
         self.session_controller.on_tick = self.handle_tick
         self.session_controller.on_session_end = self.handle_session_end
+        
+        # Register keyboard shortcut callbacks
+        self.setup_keyboard_shortcuts()
         
         # State
         self.current_image_path: Optional[Path] = None
@@ -52,9 +58,33 @@ class MainWindow(ctk.CTk):
         
         # Bind ESC key to exit fullscreen
         self.bind("<Escape>", self.exit_fullscreen)
+        
+        # Bind keyboard shortcuts
+        self.bind_keyboard_shortcuts()
 
         # Store current image path for resizing
         self.current_displayed_image: Optional[Path] = None
+    
+    def setup_keyboard_shortcuts(self):
+        """Register callbacks for keyboard shortcuts"""
+        self.shortcuts_manager.register_callback("pause_resume", self.toggle_pause)
+        self.shortcuts_manager.register_callback("previous_image", self.previous_image)
+        self.shortcuts_manager.register_callback("next_image", self.next_image)
+        self.shortcuts_manager.register_callback("previous_block", self.previous_block)
+        self.shortcuts_manager.register_callback("next_block", self.next_block_actual)
+    
+    def bind_keyboard_shortcuts(self):
+        """Bind all keyboard shortcuts to the window"""
+        # Get all shortcuts and bind them
+        for action, binding in self.shortcuts_manager.get_all_shortcuts().items():
+            for key in binding.get_all_keys():
+                self.bind(f"<{key}>", lambda e, k=key: self.handle_shortcut(k))
+    
+    def handle_shortcut(self, key: str):
+        """Handle keyboard shortcut press"""
+        # Only handle shortcuts when session is running or paused
+        if self.session_controller.state in [SessionState.RUNNING, SessionState.PAUSED]:
+            self.shortcuts_manager.handle_key_press(key)
 
     def _get_available_image_space(self):
         """
@@ -393,8 +423,8 @@ class MainWindow(ctk.CTk):
         self.start_button.pack(side="left", padx=5, before=self.prev_block_button)
 
     def open_settings(self):
-        """Open settings dialog"""
-        print("Settings clicked - TODO: implement")
+        """Open settings dialog with keyboard shortcuts"""
+        SettingsDialog(self, self.shortcuts_manager)
 
     def toggle_fullscreen(self):
         """Toggle fullscreen mode"""

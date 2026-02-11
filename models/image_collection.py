@@ -58,6 +58,15 @@ class ImageCollection:
                         if parent.name:
                             folders.add(parent.name)
         return folders
+    
+    def get_folder_list(self) -> List[str]:
+        """
+        Get sorted list of available folder names to display
+
+        :return: sorted list of folder names
+        """
+        folders = self.get_available_folders()
+        return sorted(list(folders))
 
 
     def get_images_by_folders(self, folder_names: List[str]) -> List[Path]:

@@ -95,9 +95,13 @@ class SessionController:
         
         # Stop old timer thread if exists
         if self._timer_thread and self._timer_thread.is_alive():
-            self._stop_flag.set()
-            self._timer_thread.join(timeout=0.5)
-            self._stop_flag.clear()
+            # check if called fm timer thread
+            if threading.current_thread() != self._timer_thread:
+                # if not in timer thread, join
+                self._stop_flag.set()
+                self._timer_thread.join(timeout=0.5)
+                self._stop_flag.clear()
+            # if in timer thread, let it die by itself
         
         # Start new timer thread
         self._timer_thread = threading.Thread(

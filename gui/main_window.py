@@ -91,6 +91,10 @@ class MainWindow(ctk.CTk):
 
     def previous_image(self):
         """Show previous image for current block, skip breaks"""
+        # Fixes NoneType object has no attribute "blocks" error
+        if not self.session_controller.session:
+            return
+        
         # Check if current block is a break
         current_block = self.session_controller.session.blocks[self.session_controller.current_block_index]
         
@@ -101,6 +105,10 @@ class MainWindow(ctk.CTk):
             self.session_controller.previous_image()
 
     def next_image(self):
+        # Fixes NoneType object has no attribute "blocks" error
+        if not self.session_controller.session:
+            return
+        
         """Show next image for current block, skip breaks"""
         # Check if current block is a break
         current_block = self.session_controller.session.blocks[self.session_controller.current_block_index]

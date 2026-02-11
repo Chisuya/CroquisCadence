@@ -461,13 +461,21 @@ class MainWindow(ctk.CTk):
         """Display break screen"""
         available_width, available_height = self._get_available_image_space()
 
-        max_size = min(available_width, available_height) // 2
-        
-        # Create CTkImage
+        # changed break screen to scale dynamically instead of forced square
+        img_ratio = self.break_image.width / self.break_image.height
+        frame_ratio = available_width / available_height
+
+        if img_ratio > frame_ratio:
+            new_width = available_width
+            new_height = int(available_width / img_ratio)
+        else:
+            new_height = available_height
+            new_width = int(available_height * img_ratio)
+
         ctk_image = ctk.CTkImage(
             light_image=self.break_image,
             dark_image=self.break_image,
-            size=(max_size, max_size)
+            size=(new_width, new_height)
         )
 
         self.image_label.configure(image=ctk_image, text="")

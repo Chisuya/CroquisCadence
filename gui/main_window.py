@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import threading
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
@@ -46,28 +47,29 @@ class MainWindow(ctk.CTk):
         self.current_image_path: Optional[Path] = None
         self.is_fullscreen = False
         
+        # Sound effect tracking
+        self.warning_sound_played = False 
+        
         # Image caching
-        self._image_cache = {}  # Caches PIL Image objects
+        self._image_cache = {}
         self._scaled_cache = {}  # Caches scaled CTkImage objects (key: (path, width, height))
         
         # Resize debouncing
-        self._resize_timer = None  # Timer to debounce resize events
+        self._resize_timer = None
         
         self.create_widgets()
         
         self.break_image = Image.open("assets/break_image.png")
 
-        # Bind window resize to update image
         self.bind("<Configure>", self.on_window_resize)
         
-        # Bind ESC key to exit fullscreen
         self.bind("<Escape>", self.exit_fullscreen)
         
-        # Bind keyboard shortcuts
         self.bind_keyboard_shortcuts()
 
         # Store current image path for resizing
         self.current_displayed_image: Optional[Path] = None
+        
     
     def setup_keyboard_shortcuts(self):
         """Register callbacks for keyboard shortcuts"""
@@ -108,6 +110,7 @@ class MainWindow(ctk.CTk):
             frame_width = self.image_frame.winfo_width()
             frame_height = self.image_frame.winfo_height()
         
+        # Just use frame dimensions directly with tiny margin
         available_height = max(100, frame_height - 10)
         available_width = max(100, frame_width - 10)
         
@@ -205,7 +208,7 @@ class MainWindow(ctk.CTk):
         # Info/controls bar
         self.info_bar = ctk.CTkFrame(self.main_container, fg_color=CYBER_GRAY, height=100)
         self.info_bar.pack(fill="x", side="bottom", padx=20, pady=20)
-        self.info_bar.pack_propagate(False)  # Keep fixed height
+        self.info_bar.pack_propagate(False)
         
         self.info_bar.grid_columnconfigure(0, weight=1)  # left
         self.info_bar.grid_columnconfigure(1, weight=1)  # center
@@ -374,10 +377,25 @@ class MainWindow(ctk.CTk):
         self.canvas_image_id = None
         self.canvas_image_ref = None
     
-    def handle_new_block(self, block_index, block, image_path):
-        """Called when a new block starts"""
+    def handle_new_block(self, block_index, block, image_path, is_auto=False):
+        """Called when a new block starts
+        
+        Args:
+            block_index: Index of the new block
+            block: The SessionBlock object
+            image_path: Path to the image to display
+            is_auto: True if block changed automatically (timer), False if manual (button)
+        """
         # Force UI to update immediately so controls are responsive
         self.update_idletasks()
+        
+        # Play transition sound ONLY for automatic block transitions
+        # Always play on auto-advance, even if warning played
+        if is_auto and block_index > 0:
+            self.play_transition_sound()
+        
+        # Reset warning sound flag for new block
+        self.warning_sound_played = False
         
         total_blocks = len(self.session_controller.session.blocks)
         
@@ -456,6 +474,11 @@ class MainWindow(ctk.CTk):
         
         if remaining <= threshold:
             self.timer_label.configure(text=time_text, text_color=WARNING_RED)
+            
+            # Play warning sound once when entering red zone
+            if not self.warning_sound_played:
+                self.play_warning_sound()
+                self.warning_sound_played = True
         else:
             self.timer_label.configure(text=time_text, text_color=CYBER_PINK)
         
@@ -489,7 +512,7 @@ class MainWindow(ctk.CTk):
         else:
             progress = 0
         
-        # Update progress bar (visual only)
+        # Update progress bar
         self.progress_bar.set(progress)
         
     def handle_session_end(self):
@@ -542,6 +565,108 @@ class MainWindow(ctk.CTk):
         """Open settings dialog with keyboard shortcuts"""
         SettingsDialog(self, self.shortcuts_manager)
 
+    def play_warning_sound(self):
+        """Play warning chime with volume control"""
+        def _play():
+            try:
+                import json
+                import wave
+                import struct
+                import tempfile
+                import winsound
+                
+                sound_path = Path("assets/warning.wav")
+                if not sound_path.exists():
+                    return
+                
+                # Load volume setting
+                volume_file = Path("settings/volume.json")
+                volume = 0.7  # Default
+                
+                if volume_file.exists():
+                    with open(volume_file, 'r') as f:
+                        volumes = json.load(f)
+                        volume = volumes.get('warning', 0.7)
+                
+                # Read original WAV
+                with wave.open(str(sound_path), 'rb') as wf:
+                    params = wf.getparams()
+                    frames = wf.readframes(params.nframes)
+                
+                # Adjust volume
+                samples = struct.unpack(f'{params.nframes * params.nchannels}h', frames)
+                adjusted_samples = [int(sample * volume) for sample in samples]
+                adjusted_frames = struct.pack(f'{len(adjusted_samples)}h', *adjusted_samples)
+                
+                # Write to temporary file
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
+                    temp_path = temp_wav.name
+                    with wave.open(temp_path, 'wb') as wf:
+                        wf.setparams(params)
+                        wf.writeframes(adjusted_frames)
+                
+                # Play with winsound
+                winsound.PlaySound(temp_path, winsound.SND_FILENAME)
+                
+                # Cleanup
+                Path(temp_path).unlink()
+                
+            except:
+                pass
+        
+        threading.Thread(target=_play, daemon=True).start()
+    
+    def play_transition_sound(self):
+        """Play transition sound with volume control"""
+        def _play():
+            try:
+                import json
+                import wave
+                import struct
+                import tempfile
+                import winsound
+                
+                sound_path = Path("assets/transition.wav")
+                if not sound_path.exists():
+                    return
+                
+                # Load volume setting
+                volume_file = Path("settings/volume.json")
+                volume = 0.5  # Default
+                
+                if volume_file.exists():
+                    with open(volume_file, 'r') as f:
+                        volumes = json.load(f)
+                        volume = volumes.get('transition', 0.5)
+                
+                # Read original WAV
+                with wave.open(str(sound_path), 'rb') as wf:
+                    params = wf.getparams()
+                    frames = wf.readframes(params.nframes)
+                
+                # Adjust volume
+                samples = struct.unpack(f'{params.nframes * params.nchannels}h', frames)
+                adjusted_samples = [int(sample * volume) for sample in samples]
+                adjusted_frames = struct.pack(f'{len(adjusted_samples)}h', *adjusted_samples)
+                
+                # Write to temporary file
+                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
+                    temp_path = temp_wav.name
+                    with wave.open(temp_path, 'wb') as wf:
+                        wf.setparams(params)
+                        wf.writeframes(adjusted_frames)
+                
+                # Play with winsound
+                winsound.PlaySound(temp_path, winsound.SND_FILENAME)
+                
+                # Cleanup
+                Path(temp_path).unlink()
+                
+            except:
+                pass
+        
+        threading.Thread(target=_play, daemon=True).start()
+    
     def toggle_fullscreen(self):
         """Toggle fullscreen mode"""
         self.is_fullscreen = not self.is_fullscreen
@@ -590,13 +715,11 @@ class MainWindow(ctk.CTk):
             new_height = canvas_height
             new_width = int(canvas_height * img_ratio)
 
-        # Resize image with FAST algorithm for initial display
         resized_img = img.resize((new_width, new_height), Image.Resampling.BILINEAR)
         
         # Convert to PhotoImage for tkinter Canvas
         self.canvas_image_ref = ImageTk.PhotoImage(resized_img)
         
-        # Clear canvas and draw image centered
         self.image_canvas.delete("all")
         x = canvas_width // 2
         y = canvas_height // 2
@@ -657,7 +780,7 @@ class MainWindow(ctk.CTk):
     def open_session_builder(self):
         """Open the session builder dialog"""
         dialog = SessionBuilderDialog(self)
-        self.wait_window(dialog)  # Wait for dialog to close
+        self.wait_window(dialog)
         
         # Check if user created a session
         session = dialog.get_result()

@@ -31,6 +31,8 @@ class SessionController:
         self.session: Optional[Session] = None
         self.current_block_index: int = 0
         
+        self.is_auto_advance = False
+        
         self.image_history: list[Optional[Path]] = []
         self.current_image_index: int = 0
         
@@ -47,7 +49,7 @@ class SessionController:
         self.block_start_indices: dict[int, int] = {}
         self.block_last_indices: dict[int, int] = {}
         
-        # track all images used in current session
+        # Image repetition prevention
         self.used_images_in_session: set[Path] = set()
         
     def start(self, session: Session):
@@ -61,7 +63,7 @@ class SessionController:
         self.image_history = []
         self.block_start_indices = {}
         self.block_last_indices = {}
-        self.used_images_in_session = set()  # Clear used images for new session
+        self.used_images_in_session = set()
         self.state = SessionState.RUNNING
         
         # Clear flags
@@ -78,6 +80,10 @@ class SessionController:
                 self.on_session_end()
             return
         
+        # Capture auto-advance flag before resetting
+        is_auto = self.is_auto_advance
+        self.is_auto_advance = False
+        
         self.current_block_index = block_index
         self.block_start_indices[block_index] = len(self.image_history)
         
@@ -90,9 +96,14 @@ class SessionController:
 
         self.block_last_indices[block_index] = self.current_image_index
         
-        # Notify GUI
+        # Notify GUI - pass is_auto flag if callback supports it
         if self.on_new_block:
-            self.on_new_block(self.current_block_index, block, image_path)
+            # Try passing is_auto parameter, fallback to old signature
+            try:
+                self.on_new_block(self.current_block_index, block, image_path, is_auto)
+            except TypeError:
+                # Callback doesn't accept is_auto parameter
+                self.on_new_block(self.current_block_index, block, image_path)
         
         # Start timer for this block
         self.remaining = block.duration
@@ -130,6 +141,7 @@ class SessionController:
         
         # Timer finished
         if not self._stop_flag.is_set() and self.remaining <= 0:
+            self.is_auto_advance = True  # Mark as automatic advancement
             self._start_block(self.current_block_index + 1)
     
     def _get_current_image(self):

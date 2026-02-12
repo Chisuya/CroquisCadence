@@ -93,10 +93,13 @@ class SettingsDialog(ctk.CTkToplevel):
         )
         self.content_frame.pack(fill="both", expand=True, pady=(0, 15))
         
+        # Volume settings section
+        self.create_volume_section()
+        
         # Keyboard shortcuts section
         self.create_shortcuts_section()
         
-        # Restart notification area
+        # Restart notification area (placeholder)
         self.restart_notice_container = ctk.CTkFrame(main_frame, fg_color=self.CYBER_DARK, height=0)
         self.restart_notice_container.pack(fill="x", pady=(0, 15))
         
@@ -106,7 +109,7 @@ class SettingsDialog(ctk.CTkToplevel):
             fg_color=self.CYBER_PINK,
             corner_radius=8
         )
-        # Don't pack yet - will show when shortcuts change
+        # Don't pack yet
         
         self.restart_notice_label = ctk.CTkLabel(
             self.restart_notice,
@@ -132,6 +135,110 @@ class SettingsDialog(ctk.CTkToplevel):
             height=35
         )
         close_btn.pack(side="right")
+    
+    
+    def create_volume_section(self):
+        """Create volume control sliders"""
+        volume_container = ctk.CTkFrame(self.content_frame, fg_color=self.CYBER_LIGHT_GRAY, corner_radius=8)
+        volume_container.pack(fill="x", padx=10, pady=10)
+        
+        # Header
+        volume_header = ctk.CTkLabel(
+            volume_container,
+            text="🔊 Sound Volume",
+            font=("Arial", 14, "bold"),
+            text_color=self.CYBER_BLUE
+        )
+        volume_header.pack(pady=(15, 10), padx=15, anchor="w")
+        
+        # Load current volumes
+        from pathlib import Path
+        import json
+        
+        volume_file = Path("settings/volume.json")
+        default_volumes = {"warning": 0.7, "transition": 0.5}
+        
+        if volume_file.exists():
+            with open(volume_file, 'r') as f:
+                volumes = json.load(f)
+        else:
+            volumes = default_volumes
+        
+        # Warning sound volume
+        warning_frame = ctk.CTkFrame(volume_container, fg_color="transparent")
+        warning_frame.pack(fill="x", padx=15, pady=5)
+        
+        warning_label = ctk.CTkLabel(
+            warning_frame,
+            text="⚠️ Warning Sound:",
+            font=("Arial", 12),
+            text_color=self.CYBER_TEXT
+        )
+        warning_label.pack(side="left", padx=(0, 10))
+        
+        self.warning_volume_value = ctk.CTkLabel(
+            warning_frame,
+            text=f"{int(volumes['warning'] * 100)}%",
+            font=("Arial", 11),
+            text_color=self.CYBER_PINK,
+            width=40
+        )
+        self.warning_volume_value.pack(side="right")
+        
+        self.warning_slider = ctk.CTkSlider(
+            volume_container,
+            from_=0,
+            to=1,
+            number_of_steps=20,
+            command=lambda v: self.update_volume_label(v, "warning"),
+            button_color=self.CYBER_PINK,
+            button_hover_color=self.CYBER_PURPLE,
+            progress_color=self.CYBER_PINK
+        )
+        self.warning_slider.set(volumes['warning'])
+        self.warning_slider.pack(fill="x", padx=15, pady=(0, 15))
+        
+        # Transition sound volume
+        transition_frame = ctk.CTkFrame(volume_container, fg_color="transparent")
+        transition_frame.pack(fill="x", padx=15, pady=5)
+        
+        transition_label = ctk.CTkLabel(
+            transition_frame,
+            text="🔔 Transition Sound:",
+            font=("Arial", 12),
+            text_color=self.CYBER_TEXT
+        )
+        transition_label.pack(side="left", padx=(0, 10))
+        
+        self.transition_volume_value = ctk.CTkLabel(
+            transition_frame,
+            text=f"{int(volumes['transition'] * 100)}%",
+            font=("Arial", 11),
+            text_color=self.CYBER_BLUE,
+            width=40
+        )
+        self.transition_volume_value.pack(side="right")
+        
+        self.transition_slider = ctk.CTkSlider(
+            volume_container,
+            from_=0,
+            to=1,
+            number_of_steps=20,
+            command=lambda v: self.update_volume_label(v, "transition"),
+            button_color=self.CYBER_BLUE,
+            button_hover_color=self.CYBER_TEAL,
+            progress_color=self.CYBER_BLUE
+        )
+        self.transition_slider.set(volumes['transition'])
+        self.transition_slider.pack(fill="x", padx=15, pady=(0, 15))
+    
+    def update_volume_label(self, value, sound_type):
+        """Update volume percentage label"""
+        percentage = int(value * 100)
+        if sound_type == "warning":
+            self.warning_volume_value.configure(text=f"{percentage}%")
+        else:
+            self.transition_volume_value.configure(text=f"{percentage}%")
     
     def create_shortcuts_section(self):
         """Create collapsible keyboard shortcuts section"""
@@ -298,7 +405,22 @@ class SettingsDialog(ctk.CTkToplevel):
             self.update_idletasks()
     
     def close_dialog(self):
-        """Close the dialog"""
+        """Close the dialog and save volume settings"""
+        # Save volume settings
+        from pathlib import Path
+        import json
+        
+        volumes = {
+            "warning": self.warning_slider.get(),
+            "transition": self.transition_slider.get()
+        }
+        
+        volume_file = Path("settings/volume.json")
+        volume_file.parent.mkdir(exist_ok=True)
+        
+        with open(volume_file, 'w') as f:
+            json.dump(volumes, f, indent=2)
+        
         self.grab_release()
         self.destroy()
 
@@ -341,7 +463,6 @@ class KeyEditDialog(ctk.CTkToplevel):
         # Bind key press
         self.bind("<Key>", self.on_key_press)
         
-        # Escape behavior
         if self.key_type == "secondary":
             self.bind("<Escape>", lambda e: self.clear_key())
         else:

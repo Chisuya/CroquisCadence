@@ -37,6 +37,7 @@ class MainWindow(ctk.CTk):
         self.session_controller.on_new_block = self.handle_new_block
         self.session_controller.on_tick = self.handle_tick
         self.session_controller.on_session_end = self.handle_session_end
+        self.session_controller.on_image_change = self.handle_image_change
         
         # Register keyboard shortcut callbacks
         self.setup_keyboard_shortcuts()
@@ -48,6 +49,9 @@ class MainWindow(ctk.CTk):
         # Image caching
         self._image_cache = {}  # Caches PIL Image objects
         self._scaled_cache = {}  # Caches scaled CTkImage objects (key: (path, width, height))
+        
+        # Resize debouncing
+        self._resize_timer = None  # Timer to debounce resize events
         
         self.create_widgets()
         
@@ -104,16 +108,27 @@ class MainWindow(ctk.CTk):
             frame_width = self.image_frame.winfo_width()
             frame_height = self.image_frame.winfo_height()
         
-        # Use frame dimensions directly with tiny margin
         available_height = max(100, frame_height - 10)
         available_width = max(100, frame_width - 10)
         
         return available_width, available_height
 
     def on_window_resize(self, event):
-        """Handle window resize - rescale current image"""
-        # Only resize if an image is displayed
+        """Handle window resize - rescale current image with debouncing"""
+        # Cancel previous timer if it exists
+        if self._resize_timer is not None:
+            self.after_cancel(self._resize_timer)
+        
+        # Schedule redraw after 150ms of no resize events
+        self._resize_timer = self.after(150, self._do_resize)
+    
+    def _do_resize(self):
+        """Actually perform the resize after debounce delay"""
+        self._resize_timer = None
+        
+        # Only resize if we have an image displayed
         if self.current_displayed_image and self.session_controller.state != SessionState.IDLE:
+            # Check if break or pose
             current_block = self.session_controller.session.blocks[self.session_controller.current_block_index]
             if current_block.block_type == "pose":
                 self.display_image(self.current_displayed_image)
@@ -176,7 +191,7 @@ class MainWindow(ctk.CTk):
         self.main_container = ctk.CTkFrame(self, fg_color=CYBER_DARK)
         self.main_container.pack(fill="both", expand=True, padx=0, pady=0)
 
-        # Thin progress bar
+        # Minimal progress bar
         self.progress_bar = ctk.CTkProgressBar(
             self.main_container,
             height=4,
@@ -187,7 +202,7 @@ class MainWindow(ctk.CTk):
         self.progress_bar.pack(fill="x", side="bottom", padx=0, pady=(0, 0))
         self.progress_bar.set(0)
 
-        # Controls bar
+        # Info/controls bar
         self.info_bar = ctk.CTkFrame(self.main_container, fg_color=CYBER_GRAY, height=100)
         self.info_bar.pack(fill="x", side="bottom", padx=20, pady=20)
         self.info_bar.pack_propagate(False)  # Keep fixed height
@@ -345,7 +360,7 @@ class MainWindow(ctk.CTk):
         self.image_frame = ctk.CTkFrame(self.main_container, fg_color=CYBER_DARK)
         self.image_frame.pack(fill="both", expand=True, padx=5, pady=(5, 0))
 
-        # Use Canvas instead of Label to prevent overflow and cropping issues
+        # Use Canvas instead of Label
         import tkinter as tk
         self.image_canvas = tk.Canvas(
             self.image_frame,
@@ -361,6 +376,9 @@ class MainWindow(ctk.CTk):
     
     def handle_new_block(self, block_index, block, image_path):
         """Called when a new block starts"""
+        # Force UI to update immediately so controls are responsive
+        self.update_idletasks()
+        
         total_blocks = len(self.session_controller.session.blocks)
         
         current_duration = block.duration
@@ -398,6 +416,13 @@ class MainWindow(ctk.CTk):
         
         self.block_info_label.configure(text=block_text)
 
+        # Update timer display to show the full block duration
+        minutes = block.duration // 60
+        seconds = block.duration % 60
+        time_text = f"{minutes:02d}:{seconds:02d}"
+        CYBER_PINK = "#FF6EC7"
+        self.timer_label.configure(text=time_text, text_color=CYBER_PINK)
+
         # Update progress bar
         self.update_progress()
 
@@ -405,6 +430,11 @@ class MainWindow(ctk.CTk):
             self.display_image(image_path)
         else:
             self.display_break()
+    
+    def handle_image_change(self, image_path):
+        """Called when image changes within the same block (timer should NOT reset)"""
+        if image_path:
+            self.display_image(image_path)
         
     def handle_tick(self, remaining):
         """Called every second during countdown"""
@@ -412,7 +442,22 @@ class MainWindow(ctk.CTk):
         minutes = remaining // 60
         seconds = remaining % 60
         time_text = f"{minutes:02d}:{seconds:02d}"
-        self.timer_label.configure(text=time_text)
+        
+        # Calculate warning threshold based on block duration
+        current_block = self.session_controller.session.blocks[self.session_controller.current_block_index]
+        block_duration = current_block.duration
+        
+        # Warning threshold: 10% of block duration, minimum 5s, rounded to multiple of 5
+        threshold = max(5, round((block_duration * 0.1) / 5) * 5)
+        
+        # Change color to red when below threshold
+        CYBER_PINK = "#FF6EC7"
+        WARNING_RED = "#FF3333"
+        
+        if remaining <= threshold:
+            self.timer_label.configure(text=time_text, text_color=WARNING_RED)
+        else:
+            self.timer_label.configure(text=time_text, text_color=CYBER_PINK)
         
         # Update progress bar
         self.update_progress()
@@ -444,7 +489,7 @@ class MainWindow(ctk.CTk):
         else:
             progress = 0
         
-        # Update progress bar
+        # Update progress bar (visual only)
         self.progress_bar.set(progress)
         
     def handle_session_end(self):
@@ -519,8 +564,10 @@ class MainWindow(ctk.CTk):
 
     def display_image(self, image_path: Path):
         """Display an image on canvas, scaled to fit available space"""
-        # Get canvas dimensions
+        # Force UI update FIRST so buttons appear immediately
         self.update_idletasks()
+        
+        # Get canvas dimensions
         canvas_width = self.image_canvas.winfo_width()
         canvas_height = self.image_canvas.winfo_height()
         
@@ -543,8 +590,8 @@ class MainWindow(ctk.CTk):
             new_height = canvas_height
             new_width = int(canvas_height * img_ratio)
 
-        # Resize image
-        resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        # Resize image with FAST algorithm for initial display
+        resized_img = img.resize((new_width, new_height), Image.Resampling.BILINEAR)
         
         # Convert to PhotoImage for tkinter Canvas
         self.canvas_image_ref = ImageTk.PhotoImage(resized_img)
@@ -562,8 +609,10 @@ class MainWindow(ctk.CTk):
 
     def display_break(self):
         """Display break screen on canvas"""
-        # Get canvas dimensions
+        # Force UI update first
         self.update_idletasks()
+        
+        # Get canvas dimensions
         canvas_width = self.image_canvas.winfo_width()
         canvas_height = self.image_canvas.winfo_height()
 
@@ -578,8 +627,8 @@ class MainWindow(ctk.CTk):
             new_height = canvas_height
             new_width = int(canvas_height * img_ratio)
 
-        # Resize image
-        resized_img = self.break_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        # Resize image with fast algorithm
+        resized_img = self.break_image.resize((new_width, new_height), Image.Resampling.BILINEAR)
         
         # Convert to PhotoImage
         self.canvas_image_ref = ImageTk.PhotoImage(resized_img)
@@ -596,9 +645,14 @@ class MainWindow(ctk.CTk):
 
     def start_session(self, session: Session):
         """Start any session (called by session selector or test button)"""
-        self.session_controller.start(session)
-        
+        # Hide start button IMMEDIATELY before any heavy work
         self.start_button.pack_forget()
+        
+        # Force UI update so buttons disappear right away
+        self.update_idletasks()
+        
+        # Now do the heavy work
+        self.session_controller.start(session)
     
     def open_session_builder(self):
         """Open the session builder dialog"""

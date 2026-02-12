@@ -47,6 +47,9 @@ class SessionController:
         self.block_start_indices: dict[int, int] = {}
         self.block_last_indices: dict[int, int] = {}
         
+        # track all images used in current session
+        self.used_images_in_session: set[Path] = set()
+        
     def start(self, session: Session):
         """Start a session"""
         if self.state != SessionState.IDLE:
@@ -58,6 +61,7 @@ class SessionController:
         self.image_history = []
         self.block_start_indices = {}
         self.block_last_indices = {}
+        self.used_images_in_session = set()  # Clear used images for new session
         self.state = SessionState.RUNNING
         
         # Clear flags
@@ -79,9 +83,10 @@ class SessionController:
         
         block = self.session.blocks[block_index]
         
-        image_path = self._get_current_image()
+        # Set current_image_index to the end of history BEFORE getting image
+        self.current_image_index = len(self.image_history)
         
-        self.current_image_index = len(self.image_history) - 1
+        image_path = self._get_current_image()
 
         self.block_last_indices[block_index] = self.current_image_index
         
@@ -136,12 +141,32 @@ class SessionController:
         block = self.session.blocks[self.current_block_index]
         
         if block.block_type == "pose":
-            # Get last image to exclude
-            last_image = self.image_history[-1] if self.image_history else None
-            new_image = self.image_collection.get_random_image(
-                folder_names=block.folder_paths,
-                exclude=last_image
-            )
+            # Try to get an image that hasn't been used yet
+            max_attempts = 100
+            new_image = None
+            
+            for attempt in range(max_attempts):
+                # Get a random image from the folders
+                candidate = self.image_collection.get_random_image(
+                    folder_names=block.folder_paths,
+                    exclude=None  # We'll handle exclusion ourselves
+                )
+                
+                # If this image hasn't been used, use it
+                if candidate not in self.used_images_in_session:
+                    new_image = candidate
+                    break
+                
+                # If all images have been used, reset and use any image
+                if attempt == max_attempts - 1:
+                    self.used_images_in_session.clear()
+                    new_image = candidate
+                    break
+            
+            # Mark this image as used
+            if new_image:
+                self.used_images_in_session.add(new_image)
+            
             self.image_history.append(new_image)
             return new_image
         else:
@@ -175,10 +200,11 @@ class SessionController:
         self.image_history = []
         self.block_start_indices = {}
         self.block_last_indices = {}
+        self.used_images_in_session = set()  # Clear used images
         self.remaining = 0
     
     def next_image(self):
-        """Show next image in global history"""
+        """Show next image in global history and reset timer"""
         if self.state not in [SessionState.RUNNING, SessionState.PAUSED]:
             return
         
@@ -192,12 +218,16 @@ class SessionController:
         
         image_path = self._get_current_image()
         
-        # Notify GUI directly, no timer restart
+        # Reset timer for this block
+        self.remaining = block.duration
+        self.block_start_time = time.time()
+        
+        # Notify GUI with full block info to reset timer display
         if self.on_new_block:
             self.on_new_block(self.current_block_index, block, image_path)
     
     def previous_image(self):
-        """Show previous image in global history"""
+        """Show previous image in global history and reset timer"""
         if self.state not in [SessionState.RUNNING, SessionState.PAUSED]:
             return
         
@@ -213,6 +243,11 @@ class SessionController:
 
             image_path = self.image_history[self.current_image_index]
             
+            # Reset timer for this block
+            self.remaining = block.duration
+            self.block_start_time = time.time()
+            
+            # Notify GUI with full block info to reset timer display
             if self.on_new_block:
                 self.on_new_block(self.current_block_index, block, image_path)
     

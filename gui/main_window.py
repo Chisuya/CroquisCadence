@@ -6,7 +6,7 @@ sys.path.insert(0, str(project_root))
 
 import customtkinter as ctk
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageTk
 from typing import Optional
 
 from models.session import Session, SessionBlock
@@ -89,30 +89,31 @@ class MainWindow(ctk.CTk):
     def _get_available_image_space(self):
         """
         Get available space from the image frame.
-        Frame size is now reliable because image label uses place() geometry.
+        Returns dimensions that will DEFINITELY fit within the visible area.
         """
-        # Force layout update
+        # Force complete layout update
         self.update_idletasks()
         
-        frame_width = self.image_frame.winfo_width()
+        # Get frame dimensions
         frame_height = self.image_frame.winfo_height()
+        frame_width = self.image_frame.winfo_width()
         
-        # If not laid out yet, force update and retry
+        # If not yet laid out, force update
         if frame_width <= 1 or frame_height <= 1:
             self.update()
             frame_width = self.image_frame.winfo_width()
             frame_height = self.image_frame.winfo_height()
         
-        available_width = max(100, frame_width - 40)
-        available_height = max(100, frame_height - 40)
+        # Use frame dimensions directly with tiny margin
+        available_height = max(100, frame_height - 10)
+        available_width = max(100, frame_width - 10)
         
         return available_width, available_height
 
     def on_window_resize(self, event):
         """Handle window resize - rescale current image"""
-        # Only resize if we have an image displayed
+        # Only resize if an image is displayed
         if self.current_displayed_image and self.session_controller.state != SessionState.IDLE:
-            # Check if break or pose
             current_block = self.session_controller.session.blocks[self.session_controller.current_block_index]
             if current_block.block_type == "pose":
                 self.display_image(self.current_displayed_image)
@@ -175,11 +176,22 @@ class MainWindow(ctk.CTk):
         self.main_container = ctk.CTkFrame(self, fg_color=CYBER_DARK)
         self.main_container.pack(fill="both", expand=True, padx=0, pady=0)
 
-        # Info/controls bar
+        # Thin progress bar
+        self.progress_bar = ctk.CTkProgressBar(
+            self.main_container,
+            height=4,
+            corner_radius=0,
+            progress_color=CYBER_BLUE,
+            fg_color="#1a1a1a"
+        )
+        self.progress_bar.pack(fill="x", side="bottom", padx=0, pady=(0, 0))
+        self.progress_bar.set(0)
+
+        # Controls bar
         self.info_bar = ctk.CTkFrame(self.main_container, fg_color=CYBER_GRAY, height=100)
         self.info_bar.pack(fill="x", side="bottom", padx=20, pady=20)
         self.info_bar.pack_propagate(False)  # Keep fixed height
-
+        
         self.info_bar.grid_columnconfigure(0, weight=1)  # left
         self.info_bar.grid_columnconfigure(1, weight=1)  # center
         self.info_bar.grid_columnconfigure(2, weight=1)  # right
@@ -190,7 +202,7 @@ class MainWindow(ctk.CTk):
             text="Ready to start",
             font=("Arial", 16),
             text_color=CYBER_BLUE,
-            anchor="w",  # Align text to left within its cell
+            anchor="w",
             width=300
         )
         self.block_info_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
@@ -331,16 +343,21 @@ class MainWindow(ctk.CTk):
 
         # Image display area
         self.image_frame = ctk.CTkFrame(self.main_container, fg_color=CYBER_DARK)
-        self.image_frame.pack(fill="both", expand=True, padx=20, pady=(20, 0))
+        self.image_frame.pack(fill="both", expand=True, padx=5, pady=(5, 0))
 
-        # Image label
-        # !!use place() instead of pack() to prevent overflow
-        self.image_label = ctk.CTkLabel(
+        # Use Canvas instead of Label to prevent overflow and cropping issues
+        import tkinter as tk
+        self.image_canvas = tk.Canvas(
             self.image_frame,
-            text="",
-            fg_color=CYBER_DARK
+            bg="#0f0f0f",
+            highlightthickness=0,
+            bd=0
         )
-        self.image_label.place(relx=0.5, rely=0.5, anchor="center")
+        self.image_canvas.pack(fill="both", expand=True)
+        
+        # Store canvas image reference
+        self.canvas_image_id = None
+        self.canvas_image_ref = None
     
     def handle_new_block(self, block_index, block, image_path):
         """Called when a new block starts"""
@@ -381,6 +398,9 @@ class MainWindow(ctk.CTk):
         
         self.block_info_label.configure(text=block_text)
 
+        # Update progress bar
+        self.update_progress()
+
         if block.block_type == "pose" and image_path:
             self.display_image(image_path)
         else:
@@ -388,17 +408,65 @@ class MainWindow(ctk.CTk):
         
     def handle_tick(self, remaining):
         """Called every second during countdown"""
-        # MM:SS
+        # Update timer display
         minutes = remaining // 60
         seconds = remaining % 60
         time_text = f"{minutes:02d}:{seconds:02d}"
         self.timer_label.configure(text=time_text)
         
+        # Update progress bar
+        self.update_progress()
+    
+    def update_progress(self):
+        """Update the session progress bar"""
+        if not self.session_controller.session:
+            return
+        
+        # Calculate total session duration
+        total_duration = sum(block.duration for block in self.session_controller.session.blocks)
+        
+        # Calculate time elapsed
+        current_block_index = self.session_controller.current_block_index
+        elapsed = 0
+        
+        # Add duration of completed blocks
+        for i in range(current_block_index):
+            elapsed += self.session_controller.session.blocks[i].duration
+        
+        # Add elapsed time in current block
+        current_block = self.session_controller.session.blocks[current_block_index]
+        time_into_current_block = current_block.duration - self.session_controller.remaining
+        elapsed += time_into_current_block
+        
+        # Calculate percentage
+        if total_duration > 0:
+            progress = elapsed / total_duration
+        else:
+            progress = 0
+        
+        # Update progress bar
+        self.progress_bar.set(progress)
+        
     def handle_session_end(self):
         """Called when session completes"""
         self.block_info_label.configure(text="Session complete!")
         self.pause_button.configure(text="⏸")
-        self.image_label.configure(image="", text="Session Complete!\n\nGreat work!")
+        
+        # Display completion message on canvas
+        self.image_canvas.delete("all")
+        canvas_width = self.image_canvas.winfo_width()
+        canvas_height = self.image_canvas.winfo_height()
+        self.image_canvas.create_text(
+            canvas_width // 2,
+            canvas_height // 2,
+            text="Session Complete!\n\nGreat work!",
+            fill="#67E8F9",
+            font=("Arial", 24, "bold"),
+            justify="center"
+        )
+        
+        # Update progress to 100%
+        self.progress_bar.set(1.0)
         
         # Show start button again
         self.start_button.pack(side="left", padx=5, before=self.prev_block_button)
@@ -418,6 +486,9 @@ class MainWindow(ctk.CTk):
         self.block_info_label.configure(text="Session stopped")
         self.timer_label.configure(text="00:00")
         self.pause_button.configure(text="⏸")
+        
+        # Reset progress bar
+        self.progress_bar.set(0)
         
         # Show start button again
         self.start_button.pack(side="left", padx=5, before=self.prev_block_button)
@@ -447,8 +518,11 @@ class MainWindow(ctk.CTk):
             self.toggle_fullscreen()
 
     def display_image(self, image_path: Path):
-        """Display an image, scaled to fit available space"""
-        available_width, available_height = self._get_available_image_space()
+        """Display an image on canvas, scaled to fit available space"""
+        # Get canvas dimensions
+        self.update_idletasks()
+        canvas_width = self.image_canvas.winfo_width()
+        canvas_height = self.image_canvas.winfo_height()
         
         # Load PIL image from cache
         if image_path not in self._image_cache:
@@ -458,58 +532,65 @@ class MainWindow(ctk.CTk):
         
         # Calculate scaled size maintaining aspect ratio
         img_ratio = img.width / img.height
-        frame_ratio = available_width / available_height
+        canvas_ratio = canvas_width / canvas_height
 
-        if img_ratio > frame_ratio:
-            new_width = available_width
-            new_height = int(available_width / img_ratio)
+        if img_ratio > canvas_ratio:
+            # Width-constrained
+            new_width = canvas_width
+            new_height = int(canvas_width / img_ratio)
         else:
-            new_height = available_height
-            new_width = int(available_height * img_ratio)
+            # Height-constrained
+            new_height = canvas_height
+            new_width = int(canvas_height * img_ratio)
 
-        cache_key = (image_path, new_width, new_height)
+        # Resize image
+        resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
-        if cache_key in self._scaled_cache:
-            # Use cached scaled image
-            ctk_image = self._scaled_cache[cache_key]
-        else:
-            # Create new scaled image and cache it
-            ctk_image = ctk.CTkImage(
-                light_image=img,
-                dark_image=img,
-                size=(new_width, new_height)
-            )
-            self._scaled_cache[cache_key] = ctk_image
-
-        self.image_label.configure(image=ctk_image, text="")
-        self.image_label.image = ctk_image
+        # Convert to PhotoImage for tkinter Canvas
+        self.canvas_image_ref = ImageTk.PhotoImage(resized_img)
+        
+        # Clear canvas and draw image centered
+        self.image_canvas.delete("all")
+        x = canvas_width // 2
+        y = canvas_height // 2
+        self.canvas_image_id = self.image_canvas.create_image(
+            x, y, image=self.canvas_image_ref, anchor="center"
+        )
         
         # Store for resize handler
         self.current_displayed_image = image_path
 
     def display_break(self):
-        """Display break screen"""
-        available_width, available_height = self._get_available_image_space()
+        """Display break screen on canvas"""
+        # Get canvas dimensions
+        self.update_idletasks()
+        canvas_width = self.image_canvas.winfo_width()
+        canvas_height = self.image_canvas.winfo_height()
 
-        # changed break screen to scale dynamically instead of forced square
+        # Calculate scaled size for break image
         img_ratio = self.break_image.width / self.break_image.height
-        frame_ratio = available_width / available_height
+        canvas_ratio = canvas_width / canvas_height
 
-        if img_ratio > frame_ratio:
-            new_width = available_width
-            new_height = int(available_width / img_ratio)
+        if img_ratio > canvas_ratio:
+            new_width = canvas_width
+            new_height = int(canvas_width / img_ratio)
         else:
-            new_height = available_height
-            new_width = int(available_height * img_ratio)
+            new_height = canvas_height
+            new_width = int(canvas_height * img_ratio)
 
-        ctk_image = ctk.CTkImage(
-            light_image=self.break_image,
-            dark_image=self.break_image,
-            size=(new_width, new_height)
+        # Resize image
+        resized_img = self.break_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        # Convert to PhotoImage
+        self.canvas_image_ref = ImageTk.PhotoImage(resized_img)
+        
+        # Clear canvas and draw image centered
+        self.image_canvas.delete("all")
+        x = canvas_width // 2
+        y = canvas_height // 2
+        self.canvas_image_id = self.image_canvas.create_image(
+            x, y, image=self.canvas_image_ref, anchor="center"
         )
-
-        self.image_label.configure(image=ctk_image, text="")
-        self.image_label.image = ctk_image
         
         self.current_displayed_image = None
 

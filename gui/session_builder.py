@@ -537,6 +537,9 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             if filter_text.lower() in f.lower()
         ]
         
+        # Sort alphabetically
+        filtered_folders.sort(key=str.lower)
+        
         if not filtered_folders:
             # Show no results message
             no_results = ctk.CTkLabel(
@@ -1468,6 +1471,9 @@ class EditFoldersDialog(ctk.CTkToplevel):
             f for f in self.available_folders 
             if filter_text.lower() in f.lower()
         ]
+        
+        # Sort alphabetically
+        filtered_folders.sort(key=str.lower)
         
         if not filtered_folders:
             no_results = ctk.CTkLabel(

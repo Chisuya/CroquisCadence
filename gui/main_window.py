@@ -285,16 +285,29 @@ class MainWindow(ctk.CTk):
         self.info_bar.grid_columnconfigure(1, weight=1)  # center
         self.info_bar.grid_columnconfigure(2, weight=1)  # right
 
+        # Left info frame, holds block info + folder tag
+        left_info_frame = ctk.CTkFrame(self.info_bar, fg_color=CYBER_GRAY)
+        left_info_frame.grid(row=0, column=0, padx=20, pady=10, sticky="w")
+        
         # Block info
         self.block_info_label = ctk.CTkLabel(
-            self.info_bar,
+            left_info_frame,
             text="Ready to start",
             font=("Arial", 16),
             text_color=CYBER_BLUE,
-            anchor="w",
-            width=300
+            anchor="w"
         )
-        self.block_info_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
+        self.block_info_label.pack(side="left", padx=(0, 10))
+        
+        # Folder tag, shows in UI next to block info
+        self.folder_tag_label = ctk.CTkLabel(
+            left_info_frame,
+            text="",
+            font=("Arial", 12),
+            text_color=CYBER_PURPLE,
+            anchor="w",
+        )
+        self.folder_tag_label.pack(side="left")
 
         # Timer
         self.timer_label = ctk.CTkLabel(
@@ -390,7 +403,7 @@ class MainWindow(ctk.CTk):
         # Stop button
         self.stop_button = ctk.CTkButton(
             self.button_frame,
-            text="⏹ STOP",
+            text="⏹ END SESSION",
             command=self.stop_session,
             width=100,
             fg_color=CYBER_PINK,
@@ -522,8 +535,17 @@ class MainWindow(ctk.CTk):
 
         if block.block_type == "pose" and image_path:
             self.display_image(image_path)
+            
+            # Extract and display folder name
+            try:
+                # Get the parent folder name (e.g., "hands", "poses", etc.)
+                folder_name = image_path.parent.name
+                self.folder_tag_label.configure(text=f"📁 {folder_name}")
+            except:
+                self.folder_tag_label.configure(text="")
         else:
             self.display_break()
+            self.folder_tag_label.configure(text="")
     
     def handle_image_change(self, image_path):
         """Called when image changes within the same block (timer should NOT reset)"""
@@ -594,6 +616,7 @@ class MainWindow(ctk.CTk):
     def handle_session_end(self):
         """Called when session completes"""
         self.block_info_label.configure(text="Session complete!")
+        self.folder_tag_label.configure(text="")
         self.pause_button.configure(text="⏸")
         
         # Display completion message on canvas
@@ -628,6 +651,7 @@ class MainWindow(ctk.CTk):
         """Stop the current session"""
         self.session_controller.stop()
         self.block_info_label.configure(text="Session stopped")
+        self.folder_tag_label.configure(text="")
         self.timer_label.configure(text="00:00")
         self.pause_button.configure(text="⏸")
         

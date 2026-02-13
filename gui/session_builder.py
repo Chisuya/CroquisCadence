@@ -13,7 +13,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         
         # Dialog setup
         self.title("Create Custom Session")
-        self.geometry("1000x720")  # Increased height to 720
+        self.geometry("1000x720")
         self.resizable(False, False)
         
         # Make it modal
@@ -55,16 +55,20 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         self.result: Optional[Session] = None
         self.parent_window = parent
         
+        # Load theme colors
+        from theme_config import get_theme, load_current_theme
+        theme = get_theme(load_current_theme())
+        
         # Colors
-        self.CYBER_PINK = "#FF6EC7"
-        self.CYBER_PURPLE = "#8B5CF6"
-        self.CYBER_BLUE = "#67E8F9"
-        self.CYBER_GREEN = "#67F971"
-        self.CYBER_TEAL = "#1CBC7C"
-        self.CYBER_DARK = "#0f0f0f"
-        self.CYBER_GRAY = "#1f1f1f"
-        self.CYBER_LIGHT_GRAY = "#2a2a2a"
-        self.CYBER_TEXT = "#E5E5E5"
+        self.CYBER_PINK = theme["primary"]
+        self.CYBER_PURPLE = theme["accent"]
+        self.CYBER_BLUE = theme["secondary"]
+        self.CYBER_GREEN = theme["success"]
+        self.CYBER_TEAL = theme["success"]
+        self.CYBER_DARK = theme["dark"]
+        self.CYBER_GRAY = theme["gray"]
+        self.CYBER_LIGHT_GRAY = theme["light_gray"]
+        self.CYBER_TEXT = theme["text"]
         
         self.configure(fg_color=self.CYBER_DARK)
         
@@ -316,7 +320,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             command=self.clear_all_folders,
             font=("Arial", 10),
             fg_color=self.CYBER_PINK,
-            hover_color="#FF4444",
+            hover_color=self.CYBER_PINK,
             text_color="#FFFFFF",
             width=70,
             height=22
@@ -723,7 +727,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             width=30,
             height=30,
             fg_color=self.CYBER_PINK,
-            hover_color="#FF4444",
+            hover_color=self.CYBER_PINK,
             font=("Arial", 16, "bold")
         )
         del_btn.pack(side="right", padx=2)
@@ -1091,15 +1095,19 @@ class SavePresetDialog(ctk.CTkToplevel):
         
         self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
         
+        # Load theme colors
+        from theme_config import get_theme, load_current_theme
+        theme = get_theme(load_current_theme())
+        
         # Colors
-        self.CYBER_PINK = "#FF6EC7"
-        self.CYBER_PURPLE = "#8B5CF6"
-        self.CYBER_BLUE = "#67E8F9"
-        self.CYBER_GREEN = "#67F971"
-        self.CYBER_DARK = "#0f0f0f"
-        self.CYBER_GRAY = "#1f1f1f"
-        self.CYBER_LIGHT_GRAY = "#2a2a2a"
-        self.CYBER_TEXT = "#E5E5E5"
+        self.CYBER_PINK = theme["primary"]
+        self.CYBER_PURPLE = theme["accent"]
+        self.CYBER_BLUE = theme["secondary"]
+        self.CYBER_GREEN = theme["success"]
+        self.CYBER_DARK = theme["dark"]
+        self.CYBER_GRAY = theme["gray"]
+        self.CYBER_LIGHT_GRAY = theme["light_gray"]
+        self.CYBER_TEXT = theme["text"]
         
         self.configure(fg_color=self.CYBER_DARK)
         
@@ -1309,17 +1317,33 @@ class EditFoldersDialog(ctk.CTkToplevel):
         
         self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
         
-        # Colors
-        self.CYBER_PINK = "#FF6EC7"
-        self.CYBER_PURPLE = "#8B5CF6"
-        self.CYBER_BLUE = "#67E8F9"
-        self.CYBER_GREEN = "#67F971"
-        self.CYBER_TEAL = "#1CBC7C"
-        self.CYBER_DARK = "#0f0f0f"
-        self.CYBER_GRAY = "#1f1f1f"
-        self.CYBER_LIGHT_GRAY = "#2a2a2a"
-        self.CYBER_TEXT = "#E5E5E5"
+        # Load theme colors
+        from theme_config import get_theme, load_current_theme
+        theme = get_theme(load_current_theme())
         
+        # Colors
+        self.CYBER_PINK = theme["primary"]
+        self.CYBER_PURPLE = theme["accent"]
+        self.CYBER_BLUE = theme["secondary"]
+        self.CYBER_GREEN = theme["success"]
+        self.CYBER_TEAL = theme["success"]
+        self.CYBER_DARK = theme["dark"]
+        self.CYBER_GRAY = theme["gray"]
+        self.CYBER_LIGHT_GRAY = theme["light_gray"]
+        self.CYBER_TEXT = theme["text"]
+        
+        self.configure(fg_color=self.CYBER_DARK)
+
+
+
+
+
+
+
+
+
+
+
         self.configure(fg_color=self.CYBER_DARK)
         
         # Initialize selection state from block
@@ -1376,7 +1400,7 @@ class EditFoldersDialog(ctk.CTkToplevel):
             command=self.clear_all_folders,
             font=("Arial", 10),
             fg_color=self.CYBER_PINK,
-            hover_color="#FF4444",
+            hover_color=self.CYBER_PINK,
             text_color="#FFFFFF",
             width=70,
             height=22
@@ -1480,7 +1504,7 @@ class EditFoldersDialog(ctk.CTkToplevel):
             if filter_text.lower() in f.lower()
         ]
         
-        # Sort alphabetically (case-insensitive)
+        # Sort alphabetically
         filtered_folders.sort(key=str.lower)
         
         if not filtered_folders:
@@ -1785,7 +1809,7 @@ class ManagePresetsDialog(ctk.CTkToplevel):
             command=lambda: self.delete_preset(preset_name),
             font=("Arial", 11),
             fg_color=self.CYBER_PINK,
-            hover_color="#FF4444",
+            hover_color=self.CYBER_PINK,
             width=90,
             height=35
         )

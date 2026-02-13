@@ -28,6 +28,7 @@ from controllers.session_controller import SessionController, SessionState
 from controllers.keyboard_shortcuts import KeyboardShortcutsManager
 from gui.session_builder import SessionBuilderDialog
 from gui.settings_dialog import SettingsDialog
+from theme_config import get_theme, load_current_theme
 
 
 class MainWindow(ctk.CTk):
@@ -78,10 +79,14 @@ class MainWindow(ctk.CTk):
     def __init__(self):
         super().__init__()
         
+        # Load theme
+        self.current_theme_name = load_current_theme()
+        self.theme = get_theme(self.current_theme_name)
+        
         self.title("CroquisCadence")
         self.geometry("1400x800")
         self.resizable(True, True)
-        self.configure(fg_color="#0f0f0f")
+        self.configure(fg_color=self.theme["dark"])
         
         # Set window icon
         try:
@@ -249,21 +254,32 @@ class MainWindow(ctk.CTk):
             
     def create_widgets(self):
         """Create all GUI widgets"""
-        CYBER_PINK = "#FF6EC7"
-        CYBER_DPINK = "#D74AB2"
-        CYBER_PURPLE = "#B794F6"
-        CYBER_VIOLET = "#8B5CF6"
-        CYBER_BLUE = "#67E8F9"
-        CYBER_DBLUE = "#579DDE"
-        CYBER_GREEN = "#67F971"
-        CYBER_TEAL = "#1CBC7C"
-        CYBER_ACCENT = "#A78BFA"
-        CYBER_DARK = "#0f0f0f"
-        CYBER_GRAY = "#1f1f1f"
-        CYBER_TEXT = "#E5E5E5"
+        # Use theme colors
+        t = self.theme
+        CYBER_PINK = t["primary"]
+        CYBER_DPINK = t["primary"]
+        CYBER_PURPLE = t["accent"]
+        CYBER_VIOLET = t["accent"]
+        CYBER_BLUE = t["secondary"]
+        CYBER_DBLUE = t["secondary"]
+        CYBER_GREEN = t["success"]
+        CYBER_TEAL = t["success"]
+        CYBER_ACCENT = t["accent"]
+        CYBER_DARK = t["dark"]
+        CYBER_GRAY = t["gray"]
+        CYBER_TEXT = t["text"]
         
         self.main_container = ctk.CTkFrame(self, fg_color=CYBER_DARK)
         self.main_container.pack(fill="both", expand=True, padx=0, pady=0)
+        
+        # Top accent bar
+        top_accent = ctk.CTkFrame(
+            self.main_container,
+            fg_color=CYBER_PINK,
+            height=6,
+            corner_radius=0
+        )
+        top_accent.pack(fill="x", side="top", padx=0, pady=0)
 
         # Minimal progress bar
         self.progress_bar = ctk.CTkProgressBar(
@@ -271,7 +287,7 @@ class MainWindow(ctk.CTk):
             height=4,
             corner_radius=0,
             progress_color=CYBER_BLUE,
-            fg_color="#1a1a1a"
+            fg_color=t["light_gray"]
         )
         self.progress_bar.pack(fill="x", side="bottom", padx=0, pady=(0, 0))
         self.progress_bar.set(0)
@@ -299,7 +315,7 @@ class MainWindow(ctk.CTk):
         )
         self.block_info_label.pack(side="left", padx=(0, 10))
         
-        # Folder tag (shows which subfolder current image is from) - right after block info
+        # Folder tag, right after block info
         self.folder_tag_label = ctk.CTkLabel(
             left_info_frame,
             text="",
@@ -309,7 +325,7 @@ class MainWindow(ctk.CTk):
         )
         self.folder_tag_label.pack(side="left")
 
-        # Timer and history frame (right side)
+        # Timer and history frame
         timer_frame = ctk.CTkFrame(self.info_bar, fg_color=CYBER_GRAY)
         timer_frame.grid(row=0, column=2, padx=20, pady=10, sticky="e")
         
@@ -438,7 +454,7 @@ class MainWindow(ctk.CTk):
             text="⚙",
             command=self.open_settings,
             width=60,
-            fg_color="#2D3748",
+            fg_color=CYBER_GRAY,
             hover_color=CYBER_ACCENT,
             border_width=2,
             border_color=CYBER_BLUE,
@@ -453,7 +469,7 @@ class MainWindow(ctk.CTk):
             text="⛶",
             command=self.toggle_fullscreen,
             width=60,
-            fg_color="#2D3748",
+            fg_color=CYBER_GRAY,
             hover_color=CYBER_ACCENT,
             border_width=2,
             border_color=CYBER_BLUE,
@@ -470,7 +486,7 @@ class MainWindow(ctk.CTk):
         import tkinter as tk
         self.image_canvas = tk.Canvas(
             self.image_frame,
-            bg="#0f0f0f",
+            bg=self.theme["dark"],
             highlightthickness=0,
             bd=0
         )
@@ -505,7 +521,7 @@ class MainWindow(ctk.CTk):
         current_duration = block.duration
         remaining_same_duration = 0
         
-        # Count CONSECUTIVE blocks from current onwards (stop at breaks or different duration/type)
+        # Count CONSECUTIVE blocks from current onwards
         for i in range(block_index, total_blocks):
             check_block = self.session_controller.session.blocks[i]
             
@@ -546,8 +562,7 @@ class MainWindow(ctk.CTk):
         minutes = block.duration // 60
         seconds = block.duration % 60
         time_text = f"{minutes:02d}:{seconds:02d}"
-        CYBER_PINK = "#FF6EC7"
-        self.timer_label.configure(text=time_text, text_color=CYBER_PINK)
+        self.timer_label.configure(text=time_text, text_color=self.theme.get("timer", self.theme["primary"]))
 
         # Update progress bar
         self.update_progress()
@@ -585,19 +600,16 @@ class MainWindow(ctk.CTk):
         # Warning threshold: 10% of block duration, minimum 5s, rounded to multiple of 5
         threshold = max(5, round((block_duration * 0.1) / 5) * 5)
         
-        # Change color to red when below threshold
-        CYBER_PINK = "#FF6EC7"
-        WARNING_RED = "#FF3333"
-        
+        # Change color to warning when below threshold
         if remaining <= threshold:
-            self.timer_label.configure(text=time_text, text_color=WARNING_RED)
+            self.timer_label.configure(text=time_text, text_color=self.theme["warning"])
             
             # Play warning sound once when entering red zone
             if not self.warning_sound_played:
                 self.play_warning_sound()
                 self.warning_sound_played = True
         else:
-            self.timer_label.configure(text=time_text, text_color=CYBER_PINK)
+            self.timer_label.configure(text=time_text, text_color=self.theme.get("timer", self.theme["primary"]))
         
         # Update progress bar
         self.update_progress()
@@ -1024,12 +1036,16 @@ class ImageHistoryDialog(ctk.CTkToplevel):
         self.transient(parent)
         self.grab_set()
         
+        # Load theme colors
+        from theme_config import get_theme, load_current_theme
+        theme = get_theme(load_current_theme())
+        
         # Colors
-        CYBER_DARK = "#0f0f0f"
-        CYBER_GRAY = "#1f1f1f"
-        CYBER_BLUE = "#67E8F9"
-        CYBER_PINK = "#FF6EC7"
-        CYBER_TEXT = "#E5E5E5"
+        CYBER_DARK = theme["dark"]
+        CYBER_GRAY = theme["gray"]
+        CYBER_BLUE = theme["secondary"]
+        CYBER_PINK = theme["primary"]
+        CYBER_TEXT = theme["text"]
         
         self.configure(fg_color=CYBER_DARK)
         
@@ -1056,13 +1072,13 @@ class ImageHistoryDialog(ctk.CTkToplevel):
         # Display images in a grid
         for idx, img_path in enumerate(images):
             try:
-                # Create frame for each image, clickable
+                # Create frame for each image
                 img_frame = ctk.CTkFrame(scroll_frame, fg_color=CYBER_GRAY, corner_radius=8)
                 img_frame.grid(row=idx//3, column=idx%3, padx=10, pady=10, sticky="nsew")
                 
                 # Make frame clickable
                 img_frame.bind("<Button-1>", lambda e, index=idx: self.jump_to_image(index))
-                img_frame.bind("<Enter>", lambda e, frame=img_frame: frame.configure(fg_color="#3a3a3a"))
+                img_frame.bind("<Enter>", lambda e, frame=img_frame: frame.configure(fg_color=self.theme["light_gray"]))
                 img_frame.bind("<Leave>", lambda e, frame=img_frame: frame.configure(fg_color=CYBER_GRAY))
                 
                 # Load and resize image
@@ -1101,7 +1117,7 @@ class ImageHistoryDialog(ctk.CTkToplevel):
                 )
                 number_label.pack(pady=(0, 5))
                 
-                # Make number label clickable
+                # Make number label clickable too
                 number_label.bind("<Button-1>", lambda e, index=idx: self.jump_to_image(index))
                 
             except Exception as e:

@@ -28,21 +28,26 @@ class SettingsDialog(ctk.CTkToplevel):
         # Center on parent
         self.center_on_parent(parent)
         
-        # Colors (match your cyberpunk theme)
-        self.CYBER_PINK = "#FF6EC7"
-        self.CYBER_PURPLE = "#8B5CF6"
-        self.CYBER_BLUE = "#67E8F9"
-        self.CYBER_GREEN = "#67F971"
-        self.CYBER_TEAL = "#1CBC7C"
-        self.CYBER_DARK = "#0f0f0f"
-        self.CYBER_GRAY = "#1f1f1f"
-        self.CYBER_LIGHT_GRAY = "#2a2a2a"
-        self.CYBER_TEXT = "#E5E5E5"
+        # Load theme colors
+        from theme_config import get_theme, load_current_theme
+        theme = get_theme(load_current_theme())
+        
+        # Colors (match theme)
+        self.CYBER_PINK = theme["primary"]
+        self.CYBER_PURPLE = theme["accent"]
+        self.CYBER_BLUE = theme["secondary"]
+        self.CYBER_GREEN = theme["success"]
+        self.CYBER_TEAL = theme["success"]
+        self.CYBER_DARK = theme["dark"]
+        self.CYBER_GRAY = theme["gray"]
+        self.CYBER_LIGHT_GRAY = theme["light_gray"]
+        self.CYBER_TEXT = theme["text"]
         
         self.configure(fg_color=self.CYBER_DARK)
         
         # Track if any shortcuts were edited
         self.shortcuts_changed = False
+        self.theme_changed = False
         
         # Build UI
         self.create_widgets()
@@ -95,6 +100,9 @@ class SettingsDialog(ctk.CTkToplevel):
         
         # Volume settings section
         self.create_volume_section()
+        
+        # Theme selection section
+        self.create_theme_section()
         
         # Keyboard shortcuts section
         self.create_shortcuts_section()
@@ -359,6 +367,51 @@ class SettingsDialog(ctk.CTkToplevel):
             # Store the path
             self.sound_paths[sound_type] = file_path
     
+    def create_theme_section(self):
+        """Create theme selection radio buttons"""
+        from theme_config import load_current_theme, THEMES
+        
+        theme_container = ctk.CTkFrame(self.content_frame, fg_color=self.CYBER_LIGHT_GRAY, corner_radius=8)
+        theme_container.pack(fill="x", padx=10, pady=10)
+        
+        # Header
+        theme_header = ctk.CTkLabel(
+            theme_container,
+            text="🎨 Theme",
+            font=("Arial", 14, "bold"),
+            text_color=self.CYBER_BLUE
+        )
+        theme_header.pack(pady=(15, 10), padx=15, anchor="w")
+        
+        # Load current theme
+        current_theme = load_current_theme()
+        self.selected_theme = ctk.StringVar(value=current_theme)
+        
+        # Theme options
+        themes_frame = ctk.CTkFrame(theme_container, fg_color="transparent")
+        themes_frame.pack(fill="x", padx=15, pady=(0, 15))
+        
+        for theme_key, theme_data in THEMES.items():
+            radio_btn = ctk.CTkRadioButton(
+                themes_frame,
+                text=theme_data["name"],
+                variable=self.selected_theme,
+                value=theme_key,
+                font=("Arial", 12),
+                text_color=self.CYBER_TEXT,
+                fg_color=self.CYBER_PURPLE,
+                hover_color=self.CYBER_PINK,
+                radiobutton_width=20,
+                radiobutton_height=20,
+                command=self.on_theme_changed
+            )
+            radio_btn.pack(anchor="w", pady=5)
+    
+    def on_theme_changed(self):
+        """Called when theme selection changes"""
+        self.theme_changed = True
+        self.show_restart_notice()
+    
     def create_shortcuts_section(self):
         """Create collapsible keyboard shortcuts section"""
         # Section header
@@ -528,6 +581,7 @@ class SettingsDialog(ctk.CTkToplevel):
         # Save volume settings
         from pathlib import Path
         import json
+        from theme_config import save_theme
         
         volumes = {
             "warning": self.warning_slider.get(),
@@ -544,6 +598,10 @@ class SettingsDialog(ctk.CTkToplevel):
         sound_file = Path("settings/sounds.json")
         with open(sound_file, 'w') as f:
             json.dump(self.sound_paths, f, indent=2)
+        
+        # Save theme
+        if hasattr(self, 'selected_theme'):
+            save_theme(self.selected_theme.get())
         
         self.grab_release()
         self.destroy()

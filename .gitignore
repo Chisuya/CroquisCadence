@@ -1,3 +1,10 @@
+# CroquisCadence .gitignore
+
+# User settings and data
+settings/
+user_data/
+test_data/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -19,11 +26,17 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Virtual environments
+# PyInstaller
+*.manifest
+*.spec
+
+# Virtual Environment
 venv/
 env/
 ENV/
+.venv
 
 # IDE
 .vscode/
@@ -31,18 +44,17 @@ ENV/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
-Thumbs.db
 
-# User data
-user_data/
+# Logs
 *.log
 
-# Test data (optional - include if you want to share test images)
-test_data/
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
 
-# Cache
-.cache/
+# Temporary files
+*.tmp
+*.bak
 *.cache

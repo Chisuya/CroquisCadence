@@ -96,9 +96,6 @@ class SettingsDialog(ctk.CTkToplevel):
         # Volume settings section
         self.create_volume_section()
         
-        # Reference folder section
-        self.create_reference_folder_section()
-        
         # Keyboard shortcuts section
         self.create_shortcuts_section()
         
@@ -234,6 +231,101 @@ class SettingsDialog(ctk.CTkToplevel):
         )
         self.transition_slider.set(volumes['transition'])
         self.transition_slider.pack(fill="x", padx=15, pady=(0, 15))
+        
+        # Sound file selection
+        sound_file_header = ctk.CTkLabel(
+            volume_container,
+            text="Sound Files:",
+            font=("Arial", 12, "bold"),
+            text_color=self.CYBER_TEXT
+        )
+        sound_file_header.pack(pady=(5, 5), padx=15, anchor="w")
+        
+        # Load current sound paths
+        sound_file = Path("settings/sounds.json")
+        default_sounds = {
+            "warning": "assets/warning.wav",
+            "transition": "assets/transition.wav"
+        }
+        
+        if sound_file.exists():
+            with open(sound_file, 'r') as f:
+                sound_paths = json.load(f)
+        else:
+            sound_paths = default_sounds
+        
+        # Warning sound file
+        warning_file_frame = ctk.CTkFrame(volume_container, fg_color="transparent")
+        warning_file_frame.pack(fill="x", padx=15, pady=5)
+        
+        warning_file_label = ctk.CTkLabel(
+            warning_file_frame,
+            text="⚠️ Warning:",
+            font=("Arial", 11),
+            text_color=self.CYBER_TEXT,
+            width=80
+        )
+        warning_file_label.pack(side="left")
+        
+        warning_filename = Path(sound_paths.get('warning', default_sounds['warning'])).name
+        self.warning_file_display = ctk.CTkLabel(
+            warning_file_frame,
+            text=warning_filename,
+            font=("Arial", 10),
+            text_color=self.CYBER_PINK,
+            anchor="w"
+        )
+        self.warning_file_display.pack(side="left", padx=10, fill="x", expand=True)
+        
+        warning_browse_btn = ctk.CTkButton(
+            warning_file_frame,
+            text="Browse...",
+            command=lambda: self.browse_sound_file("warning"),
+            width=80,
+            height=25,
+            font=("Arial", 10),
+            fg_color=self.CYBER_PURPLE,
+            hover_color=self.CYBER_PINK
+        )
+        warning_browse_btn.pack(side="right")
+        
+        # Transition sound file
+        transition_file_frame = ctk.CTkFrame(volume_container, fg_color="transparent")
+        transition_file_frame.pack(fill="x", padx=15, pady=(5, 15))
+        
+        transition_file_label = ctk.CTkLabel(
+            transition_file_frame,
+            text="🔔 Transition:",
+            font=("Arial", 11),
+            text_color=self.CYBER_TEXT,
+            width=80
+        )
+        transition_file_label.pack(side="left")
+        
+        transition_filename = Path(sound_paths.get('transition', default_sounds['transition'])).name
+        self.transition_file_display = ctk.CTkLabel(
+            transition_file_frame,
+            text=transition_filename,
+            font=("Arial", 10),
+            text_color=self.CYBER_BLUE,
+            anchor="w"
+        )
+        self.transition_file_display.pack(side="left", padx=10, fill="x", expand=True)
+        
+        transition_browse_btn = ctk.CTkButton(
+            transition_file_frame,
+            text="Browse...",
+            command=lambda: self.browse_sound_file("transition"),
+            width=80,
+            height=25,
+            font=("Arial", 10),
+            fg_color=self.CYBER_PURPLE,
+            hover_color=self.CYBER_PINK
+        )
+        transition_browse_btn.pack(side="right")
+        
+        # Store sound paths for saving later
+        self.sound_paths = sound_paths
     
     def update_volume_label(self, value, sound_type):
         """Update volume percentage label"""
@@ -243,88 +335,29 @@ class SettingsDialog(ctk.CTkToplevel):
         else:
             self.transition_volume_value.configure(text=f"{percentage}%")
     
-    def create_reference_folder_section(self):
-        """Create reference folder selection"""
-        from pathlib import Path
-        import json
+    def browse_sound_file(self, sound_type):
+        """Browse for custom sound file"""
         from tkinter import filedialog
-        
-        folder_container = ctk.CTkFrame(self.content_frame, fg_color=self.CYBER_LIGHT_GRAY, corner_radius=8)
-        folder_container.pack(fill="x", padx=10, pady=10)
-        
-        # Header
-        folder_header = ctk.CTkLabel(
-            folder_container,
-            text="📁 Reference Folder",
-            font=("Arial", 14, "bold"),
-            text_color=self.CYBER_BLUE
-        )
-        folder_header.pack(pady=(15, 10), padx=15, anchor="w")
-        
-        # Current folder display
-        settings_file = Path("settings/app_settings.json")
-        current_folder = "Not set"
-        
-        if settings_file.exists():
-            try:
-                with open(settings_file, 'r') as f:
-                    settings = json.load(f)
-                    current_folder = settings.get('reference_folder', 'Not set')
-            except:
-                pass
-        
-        self.folder_label = ctk.CTkLabel(
-            folder_container,
-            text=f"Current: {current_folder}",
-            font=("Arial", 10),
-            text_color=self.CYBER_TEXT,
-            wraplength=480
-        )
-        self.folder_label.pack(padx=15, pady=(0, 10))
-        
-        # Change button
-        change_btn = ctk.CTkButton(
-            folder_container,
-            text="Change Folder",
-            command=self.change_reference_folder,
-            font=("Arial", 12),
-            fg_color=self.CYBER_PURPLE,
-            hover_color=self.CYBER_PINK,
-            width=150,
-            height=30
-        )
-        change_btn.pack(padx=15, pady=(0, 15))
-    
-    def change_reference_folder(self):
-        """Allow user to change reference folder"""
         from pathlib import Path
-        import json
-        from tkinter import filedialog
         
-        folder = filedialog.askdirectory(
-            title="Select Reference Images Folder",
-            mustexist=True
+        file_path = filedialog.askopenfilename(
+            title=f"Select {sound_type.capitalize()} Sound",
+            filetypes=[
+                ("WAV files", "*.wav"),
+                ("All files", "*.*")
+            ]
         )
         
-        if folder:
-            ref_path = Path(folder)
+        if file_path:
+            # Update the display
+            filename = Path(file_path).name
+            if sound_type == "warning":
+                self.warning_file_display.configure(text=filename)
+            else:
+                self.transition_file_display.configure(text=filename)
             
-            # Save to settings
-            settings_file = Path("settings/app_settings.json")
-            settings_file.parent.mkdir(exist_ok=True)
-            settings = {'reference_folder': str(ref_path)}
-            with open(settings_file, 'w') as f:
-                json.dump(settings, f, indent=2)
-            
-            # Update display
-            self.folder_label.configure(text=f"Current: {ref_path}")
-            
-            # Show restart notice
-            from tkinter import messagebox
-            messagebox.showinfo(
-                "Restart Required",
-                "Reference folder updated!\n\nPlease restart the app for changes to take effect."
-            )
+            # Store the path
+            self.sound_paths[sound_type] = file_path
     
     def create_shortcuts_section(self):
         """Create collapsible keyboard shortcuts section"""
@@ -506,6 +539,11 @@ class SettingsDialog(ctk.CTkToplevel):
         
         with open(volume_file, 'w') as f:
             json.dump(volumes, f, indent=2)
+        
+        # Save sound file paths
+        sound_file = Path("settings/sounds.json")
+        with open(sound_file, 'w') as f:
+            json.dump(self.sound_paths, f, indent=2)
         
         self.grab_release()
         self.destroy()

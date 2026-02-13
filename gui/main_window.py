@@ -285,7 +285,7 @@ class MainWindow(ctk.CTk):
         self.info_bar.grid_columnconfigure(1, weight=1)  # center
         self.info_bar.grid_columnconfigure(2, weight=1)  # right
 
-        # Left info frame, holds block info + folder tag
+        # Left info frame (holds block info + folder tag)
         left_info_frame = ctk.CTkFrame(self.info_bar, fg_color=CYBER_GRAY)
         left_info_frame.grid(row=0, column=0, padx=20, pady=10, sticky="w")
         
@@ -299,7 +299,7 @@ class MainWindow(ctk.CTk):
         )
         self.block_info_label.pack(side="left", padx=(0, 10))
         
-        # Folder tag, shows in UI next to block info
+        # Folder tag (shows which subfolder current image is from) - right after block info
         self.folder_tag_label = ctk.CTkLabel(
             left_info_frame,
             text="",
@@ -405,7 +405,7 @@ class MainWindow(ctk.CTk):
             self.button_frame,
             text="⏹ END SESSION",
             command=self.stop_session,
-            width=100,
+            width=140,
             fg_color=CYBER_PINK,
             hover_color=CYBER_DPINK,
             text_color="white",
@@ -675,7 +675,19 @@ class MainWindow(ctk.CTk):
                 import tempfile
                 import winsound
                 
-                sound_path = Path(resource_path("assets/warning.wav"))
+                # Load sound file path from settings
+                sound_file = Path("settings/sounds.json")
+                default_path = "assets/warning.wav"
+                
+                if sound_file.exists():
+                    with open(sound_file, 'r') as f:
+                        sounds = json.load(f)
+                        sound_path_str = sounds.get('warning', default_path)
+                else:
+                    sound_path_str = default_path
+                
+                sound_path = Path(resource_path(sound_path_str)) if sound_path_str.startswith("assets/") else Path(sound_path_str)
+                
                 if not sound_path.exists():
                     return
                 
@@ -726,7 +738,19 @@ class MainWindow(ctk.CTk):
                 import tempfile
                 import winsound
                 
-                sound_path = Path(resource_path("assets/transition.wav"))
+                # Load sound file path from settings
+                sound_file = Path("settings/sounds.json")
+                default_path = "assets/transition.wav"
+                
+                if sound_file.exists():
+                    with open(sound_file, 'r') as f:
+                        sounds = json.load(f)
+                        sound_path_str = sounds.get('transition', default_path)
+                else:
+                    sound_path_str = default_path
+                
+                sound_path = Path(resource_path(sound_path_str)) if sound_path_str.startswith("assets/") else Path(sound_path_str)
+                
                 if not sound_path.exists():
                     return
                 

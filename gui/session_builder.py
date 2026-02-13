@@ -99,7 +99,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         
         self.name_entry = ctk.CTkEntry(
             name_frame,
-            placeholder_text="My Custom Session",
+            placeholder_text="Enter session name (used for presets)",
             font=("Arial", 13),
             width=250
         )
@@ -1006,8 +1006,11 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             self.show_error("Please add at least one block before saving!")
             return
         
-        # Open custom save dialog
-        SavePresetDialog(self, self.blocks, self.on_preset_saved)
+        # Get session name from input field
+        session_name = self.name_entry.get().strip()
+        
+        # Open custom save dialog with session name prefilled
+        SavePresetDialog(self, self.blocks, self.on_preset_saved, default_name=session_name)
     
     def on_preset_saved(self, preset_name: str, preset_data: dict):
         """Callback when preset is saved from dialog"""
@@ -1044,11 +1047,12 @@ class SessionBuilderDialog(ctk.CTkToplevel):
 class SavePresetDialog(ctk.CTkToplevel):
     """Dialog for saving presets with options"""
     
-    def __init__(self, parent, blocks: List[SessionBlock], on_save_callback):
+    def __init__(self, parent, blocks: List[SessionBlock], on_save_callback, default_name: str = ""):
         super().__init__(parent)
         
         self.blocks = blocks
         self.on_save_callback = on_save_callback
+        self.default_name = default_name if default_name else ""
         
         # Dialog setup
         self.title("Save Preset")
@@ -1132,6 +1136,10 @@ class SavePresetDialog(ctk.CTkToplevel):
             height=35
         )
         self.name_entry.pack(fill="x", pady=(0, 25))
+        
+        # Set default name if provided
+        if self.default_name:
+            self.name_entry.insert(0, self.default_name)
         
         # Options
         options_label = ctk.CTkLabel(
@@ -1472,7 +1480,7 @@ class EditFoldersDialog(ctk.CTkToplevel):
             if filter_text.lower() in f.lower()
         ]
         
-        # Sort alphabetically
+        # Sort alphabetically (case-insensitive)
         filtered_folders.sort(key=str.lower)
         
         if not filtered_folders:

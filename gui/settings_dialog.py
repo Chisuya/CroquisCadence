@@ -164,7 +164,7 @@ class SettingsDialog(ctk.CTkToplevel):
         import json
         
         volume_file = Path("settings/volume.json")
-        default_volumes = {"warning": 0.7, "transition": 0.5}
+        default_volumes = {"warning": 0.7, "transition": 1.0}
         
         if volume_file.exists():
             with open(volume_file, 'r') as f:
@@ -252,8 +252,8 @@ class SettingsDialog(ctk.CTkToplevel):
         # Load current sound paths
         sound_file = Path("settings/sounds.json")
         default_sounds = {
-            "warning": "assets/warning.wav",
-            "transition": "assets/transition.wav"
+            "warning": "assets/bell.wav",
+            "transition": "assets/page_turn_stiff.wav"
         }
         
         if sound_file.exists():

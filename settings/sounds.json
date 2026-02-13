@@ -1,4 +1,4 @@
 {
-  "warning": "C:/Users/Heiko/Documents/Projects/CroquisCadence/assets/warning.wav",
-  "transition": "C:/Users/Heiko/Documents/Projects/CroquisCadence/assets/page_turn_stiff.wav"
+  "warning": "assets/bell.wav",
+  "transition": "assets/page_turn_stiff.wav"
 }

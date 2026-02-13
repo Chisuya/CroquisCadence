@@ -745,7 +745,7 @@ class MainWindow(ctk.CTk):
                 
                 # Load sound file path from settings
                 sound_file = Path("settings/sounds.json")
-                default_path = "assets/warning.wav"
+                default_path = "assets/bell.wav"
                 
                 if sound_file.exists():
                     with open(sound_file, 'r') as f:
@@ -808,7 +808,7 @@ class MainWindow(ctk.CTk):
                 
                 # Load sound file path from settings
                 sound_file = Path("settings/sounds.json")
-                default_path = "assets/transition.wav"
+                default_path = "assets/page_turn_stiff.wav"
                 
                 if sound_file.exists():
                     with open(sound_file, 'r') as f:
@@ -824,12 +824,12 @@ class MainWindow(ctk.CTk):
                 
                 # Load volume setting
                 volume_file = Path("settings/volume.json")
-                volume = 0.5  # Default
+                volume = 1.0  # Default
                 
                 if volume_file.exists():
                     with open(volume_file, 'r') as f:
                         volumes = json.load(f)
-                        volume = volumes.get('transition', 0.5)
+                        volume = volumes.get('transition', 1.0)
                 
                 # Read original WAV
                 with wave.open(str(sound_path), 'rb') as wf:

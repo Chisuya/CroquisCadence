@@ -1,6 +1,18 @@
 import sys
 from pathlib import Path
 import threading
+import os
+
+# Get base path for resources (works with PyInstaller)
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
@@ -19,6 +31,50 @@ from gui.settings_dialog import SettingsDialog
 
 
 class MainWindow(ctk.CTk):
+    def get_reference_folder_path(self):
+        """Get reference folder path from settings or prompt user to choose"""
+        import json
+        from tkinter import filedialog, messagebox
+        
+        settings_file = Path("settings/app_settings.json")
+        
+        # Try to load from settings
+        if settings_file.exists():
+            try:
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+                    ref_path = Path(settings.get('reference_folder', ''))
+                    if ref_path.exists():
+                        return ref_path
+            except:
+                pass
+        
+        # Prompt user to choose folder
+        messagebox.showinfo(
+            "Select Reference Folder",
+            "Welcome to CroquisCadence!\n\n"
+            "Please select the folder containing your reference images.\n\n"
+            "You can organize images into subfolders (e.g., 'hands', 'poses', 'anatomy')."
+        )
+        
+        folder = filedialog.askdirectory(
+            title="Select Reference Images Folder",
+            mustexist=True
+        )
+        
+        if not folder:
+            return None  # User cancelled
+        
+        ref_path = Path(folder)
+        
+        # Save to settings
+        settings_file.parent.mkdir(exist_ok=True)
+        settings = {'reference_folder': str(ref_path)}
+        with open(settings_file, 'w') as f:
+            json.dump(settings, f, indent=2)
+        
+        return ref_path
+    
     def __init__(self):
         super().__init__()
         
@@ -26,11 +82,26 @@ class MainWindow(ctk.CTk):
         self.geometry("1400x800")
         self.resizable(True, True)
         self.configure(fg_color="#0f0f0f")
+        
+        # Set window icon
+        try:
+            icon_path = resource_path("assets/icon.ico")
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
+        except:
+            pass  # Icon is optional, continue without it
 
         ctk.set_appearance_mode("dark")
         
+        # Get reference folder path from settings or prompt user
+        reference_path = self.get_reference_folder_path()
+        if not reference_path:
+            # User cancelled or no path - exit
+            self.destroy()
+            return
+        
         # Initialize controllers
-        self.image_collection = ImageCollection(Path("test_data/references"))
+        self.image_collection = ImageCollection(reference_path)
         self.session_controller = SessionController(self.image_collection)
         self.shortcuts_manager = KeyboardShortcutsManager()
         
@@ -59,7 +130,7 @@ class MainWindow(ctk.CTk):
         
         self.create_widgets()
         
-        self.break_image = Image.open("assets/break_image.png")
+        self.break_image = Image.open(resource_path("assets/break_image.jpg"))
 
         self.bind("<Configure>", self.on_window_resize)
         
@@ -402,11 +473,16 @@ class MainWindow(ctk.CTk):
         current_duration = block.duration
         remaining_same_duration = 0
         
-        # Count from current block onwards
+        # Count CONSECUTIVE blocks from current onwards (stop at breaks or different duration/type)
         for i in range(block_index, total_blocks):
             check_block = self.session_controller.session.blocks[i]
+            
+            # Only count if same type AND same duration
             if check_block.block_type == block.block_type and check_block.duration == current_duration:
                 remaining_same_duration += 1
+            else:
+                # Hit a different block type or duration - stop counting
+                break
         
         # Format the block info text
         if block.block_type == "pose":
@@ -575,7 +651,7 @@ class MainWindow(ctk.CTk):
                 import tempfile
                 import winsound
                 
-                sound_path = Path("assets/warning.wav")
+                sound_path = Path(resource_path("assets/warning.wav"))
                 if not sound_path.exists():
                     return
                 
@@ -612,7 +688,7 @@ class MainWindow(ctk.CTk):
                 Path(temp_path).unlink()
                 
             except:
-                pass
+                pass  # Silently fail if sound doesn't work
         
         threading.Thread(target=_play, daemon=True).start()
     
@@ -626,7 +702,7 @@ class MainWindow(ctk.CTk):
                 import tempfile
                 import winsound
                 
-                sound_path = Path("assets/transition.wav")
+                sound_path = Path(resource_path("assets/transition.wav"))
                 if not sound_path.exists():
                     return
                 
@@ -663,7 +739,7 @@ class MainWindow(ctk.CTk):
                 Path(temp_path).unlink()
                 
             except:
-                pass
+                pass  # Silently fail if sound doesn't work
         
         threading.Thread(target=_play, daemon=True).start()
     

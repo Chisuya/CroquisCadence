@@ -96,6 +96,9 @@ class SettingsDialog(ctk.CTkToplevel):
         # Volume settings section
         self.create_volume_section()
         
+        # Reference folder section
+        self.create_reference_folder_section()
+        
         # Keyboard shortcuts section
         self.create_shortcuts_section()
         
@@ -239,6 +242,89 @@ class SettingsDialog(ctk.CTkToplevel):
             self.warning_volume_value.configure(text=f"{percentage}%")
         else:
             self.transition_volume_value.configure(text=f"{percentage}%")
+    
+    def create_reference_folder_section(self):
+        """Create reference folder selection"""
+        from pathlib import Path
+        import json
+        from tkinter import filedialog
+        
+        folder_container = ctk.CTkFrame(self.content_frame, fg_color=self.CYBER_LIGHT_GRAY, corner_radius=8)
+        folder_container.pack(fill="x", padx=10, pady=10)
+        
+        # Header
+        folder_header = ctk.CTkLabel(
+            folder_container,
+            text="📁 Reference Folder",
+            font=("Arial", 14, "bold"),
+            text_color=self.CYBER_BLUE
+        )
+        folder_header.pack(pady=(15, 10), padx=15, anchor="w")
+        
+        # Current folder display
+        settings_file = Path("settings/app_settings.json")
+        current_folder = "Not set"
+        
+        if settings_file.exists():
+            try:
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+                    current_folder = settings.get('reference_folder', 'Not set')
+            except:
+                pass
+        
+        self.folder_label = ctk.CTkLabel(
+            folder_container,
+            text=f"Current: {current_folder}",
+            font=("Arial", 10),
+            text_color=self.CYBER_TEXT,
+            wraplength=480
+        )
+        self.folder_label.pack(padx=15, pady=(0, 10))
+        
+        # Change button
+        change_btn = ctk.CTkButton(
+            folder_container,
+            text="Change Folder",
+            command=self.change_reference_folder,
+            font=("Arial", 12),
+            fg_color=self.CYBER_PURPLE,
+            hover_color=self.CYBER_PINK,
+            width=150,
+            height=30
+        )
+        change_btn.pack(padx=15, pady=(0, 15))
+    
+    def change_reference_folder(self):
+        """Allow user to change reference folder"""
+        from pathlib import Path
+        import json
+        from tkinter import filedialog
+        
+        folder = filedialog.askdirectory(
+            title="Select Reference Images Folder",
+            mustexist=True
+        )
+        
+        if folder:
+            ref_path = Path(folder)
+            
+            # Save to settings
+            settings_file = Path("settings/app_settings.json")
+            settings_file.parent.mkdir(exist_ok=True)
+            settings = {'reference_folder': str(ref_path)}
+            with open(settings_file, 'w') as f:
+                json.dump(settings, f, indent=2)
+            
+            # Update display
+            self.folder_label.configure(text=f"Current: {ref_path}")
+            
+            # Show restart notice
+            from tkinter import messagebox
+            messagebox.showinfo(
+                "Restart Required",
+                "Reference folder updated!\n\nPlease restart the app for changes to take effect."
+            )
     
     def create_shortcuts_section(self):
         """Create collapsible keyboard shortcuts section"""

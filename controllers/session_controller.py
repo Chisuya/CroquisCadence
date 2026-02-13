@@ -44,6 +44,7 @@ class SessionController:
         self._timer_thread: Optional[threading.Thread] = None
         self._stop_flag = threading.Event()
         self._pause_flag = threading.Event()
+        self._current_thread_id = 0  # Unique ID for each timer thread
         
         # Block tracking
         self.block_start_indices: dict[int, int] = {}
@@ -106,41 +107,50 @@ class SessionController:
                 self.on_new_block(self.current_block_index, block, image_path)
         
         # Start timer for this block
-        self.remaining = block.duration
+        block_duration = block.duration
+        self.remaining = block_duration
         self.block_start_time = time.time()
         
-        # Stop old timer thread if exists
-        if self._timer_thread and self._timer_thread.is_alive():
-            # check if called fm timer thread
-            if threading.current_thread() != self._timer_thread:
-                # if not in timer thread, join
-                self._stop_flag.set()
-                self._timer_thread.join(timeout=0.5)
-                self._stop_flag.clear()
-            # if in timer thread, let it die by itself
+        # Increment thread ID and start new timer
+        self._current_thread_id += 1
+        thread_id = self._current_thread_id
         
-        # Start new timer thread
+        # Start new timer thread with its ID and duration
         self._timer_thread = threading.Thread(
             target=self._timer_loop,
+            args=(thread_id, block_duration),
             daemon=True
         )
         self._timer_thread.start()
     
-    def _timer_loop(self):
-        """Simple timer that just counts down"""
-        while self.remaining > 0 and not self._stop_flag.is_set():
+    def _timer_loop(self, thread_id, duration):
+        """Simple timer that just counts down - exits if no longer current thread"""
+        remaining = duration  # Local variable to avoid conflicts with other threads
+        
+        while remaining > 0:
+            # Check if this thread has been invalidated
+            if thread_id != self._current_thread_id:
+                return  # This thread is obsolete, exit immediately
+            
+            if self._stop_flag.is_set():
+                return
+            
             if self._pause_flag.is_set():
                 time.sleep(0.1)
                 continue
-    
+            
+            # Update shared remaining for display
+            self.remaining = remaining
+            
             if self.on_tick:
-                self.on_tick(self.remaining)
+                self.on_tick(remaining)
             
             time.sleep(1)
-            self.remaining -= 1
+            remaining -= 1
         
-        # Timer finished
-        if not self._stop_flag.is_set() and self.remaining <= 0:
+        # Only advance block if this is still the current thread
+        if thread_id == self._current_thread_id and not self._stop_flag.is_set():
+            self.remaining = 0
             self.is_auto_advance = True  # Mark as automatic advancement
             self._start_block(self.current_block_index + 1)
     
@@ -230,9 +240,21 @@ class SessionController:
         
         image_path = self._get_current_image()
         
-        # Reset timer for this block
+        # Reset timer by invalidating old thread and starting new one
         self.remaining = block.duration
         self.block_start_time = time.time()
+        
+        # Increment thread ID to kill old timer and start fresh
+        self._current_thread_id += 1
+        thread_id = self._current_thread_id
+        
+        # Start new timer thread
+        self._timer_thread = threading.Thread(
+            target=self._timer_loop,
+            args=(thread_id, block.duration),
+            daemon=True
+        )
+        self._timer_thread.start()
         
         # Notify GUI with full block info to reset timer display
         if self.on_new_block:
@@ -247,21 +269,44 @@ class SessionController:
         if block.block_type != "pose":
             return  # Can't change images on break
         
-        # Move backward in global image history
-        if self.current_image_index > 0:
-            self.current_image_index -= 1
-            
-            self.block_last_indices[self.current_block_index] = self.current_image_index
-
-            image_path = self.image_history[self.current_image_index]
-            
-            # Reset timer for this block
-            self.remaining = block.duration
-            self.block_start_time = time.time()
-            
-            # Notify GUI with full block info to reset timer display
-            if self.on_new_block:
-                self.on_new_block(self.current_block_index, block, image_path)
+        # Get the start index for this block
+        block_start = self.block_start_indices.get(self.current_block_index, 0)
+        
+        # Go backward, skipping any None (break) images
+        new_index = self.current_image_index - 1
+        
+        # Keep going back until we find a real image (not None) or hit block start
+        while new_index >= block_start:
+            if self.image_history[new_index] is not None:
+                # Found a valid image
+                self.current_image_index = new_index
+                self.block_last_indices[self.current_block_index] = self.current_image_index
+                
+                image_path = self.image_history[self.current_image_index]
+                
+                # Reset timer by invalidating old thread and starting new one
+                self.remaining = block.duration
+                self.block_start_time = time.time()
+                
+                # Increment thread ID to kill old timer and start fresh
+                self._current_thread_id += 1
+                thread_id = self._current_thread_id
+                
+                # Start new timer thread
+                self._timer_thread = threading.Thread(
+                    target=self._timer_loop,
+                    args=(thread_id, block.duration),
+                    daemon=True
+                )
+                self._timer_thread.start()
+                
+                # Notify GUI with full block info to reset timer display
+                if self.on_new_block:
+                    self.on_new_block(self.current_block_index, block, image_path)
+                return
+            new_index -= 1
+        
+        # If we got here, there are no previous images in this block (do nothing)
     
     def skip_to_next_block(self):
         """Move to next block"""
@@ -271,10 +316,8 @@ class SessionController:
         if self.current_block_index >= len(self.session.blocks) - 1:
             return
         
-        self._stop_flag.set()
-        if self._timer_thread:
-            self._timer_thread.join(timeout=0.5)
-        self._stop_flag.clear()
+        # Invalidate any running timer threads by incrementing ID
+        self._current_thread_id += 1
         
         self.current_image_index = len(self.image_history)
         self._start_block(self.current_block_index + 1)
@@ -287,11 +330,8 @@ class SessionController:
         if self.current_block_index <= 0:
             return
         
-        # Stop current timer
-        self._stop_flag.set()
-        if self._timer_thread:
-            self._timer_thread.join(timeout=0.5)
-        self._stop_flag.clear()
+        # Invalidate any running timer threads by incrementing ID
+        self._current_thread_id += 1
         
         # Move to previous block
         prev_block_index = self.current_block_index - 1

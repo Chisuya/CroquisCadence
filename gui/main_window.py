@@ -309,14 +309,33 @@ class MainWindow(ctk.CTk):
         )
         self.folder_tag_label.pack(side="left")
 
+        # Timer and history frame (right side)
+        timer_frame = ctk.CTkFrame(self.info_bar, fg_color=CYBER_GRAY)
+        timer_frame.grid(row=0, column=2, padx=20, pady=10, sticky="e")
+        
         # Timer
         self.timer_label = ctk.CTkLabel(
-            self.info_bar,
+            timer_frame,
             text="00:00",
             font=("Arial", 32, "bold"),
             text_color=CYBER_PINK
         )
-        self.timer_label.grid(row=0, column=2, padx=20, pady=10, sticky="e")
+        self.timer_label.pack(side="left", padx=(0, 10))
+        
+        # Image history button
+        self.history_button = ctk.CTkButton(
+            timer_frame,
+            text="📜",
+            command=self.show_image_history,
+            width=45,
+            height=45,
+            font=("Arial", 20),
+            fg_color=CYBER_PURPLE,
+            hover_color=CYBER_PINK,
+            corner_radius=8
+        )
+        self.history_button.pack(side="left")
+        self.history_button.pack_forget()  # Hidden by default, shown during session
 
         # Control buttons
         self.button_frame = ctk.CTkFrame(self.info_bar, fg_color=CYBER_GRAY)
@@ -619,6 +638,9 @@ class MainWindow(ctk.CTk):
         self.folder_tag_label.configure(text="")
         self.pause_button.configure(text="⏸")
         
+        # Hide history button
+        self.history_button.pack_forget()
+        
         # Display completion message on canvas
         self.image_canvas.delete("all")
         canvas_width = self.image_canvas.winfo_width()
@@ -655,12 +677,46 @@ class MainWindow(ctk.CTk):
         self.timer_label.configure(text="00:00")
         self.pause_button.configure(text="⏸")
         
+        # Hide history button
+        self.history_button.pack_forget()
+        
         # Reset progress bar
         self.progress_bar.set(0)
         
         # Show start button again
         self.start_button.pack(side="left", padx=5, before=self.prev_block_button)
 
+    def show_image_history(self):
+        """Show dialog with all images from current block"""
+        if not self.session_controller.session:
+            return
+        
+        # Get current block index and history
+        current_block_idx = self.session_controller.current_block_index
+        current_block = self.session_controller.session.blocks[current_block_idx]
+        
+        # Only show for pose blocks
+        if current_block.block_type != "pose":
+            return
+        
+        # Get block start and current indices
+        block_start = self.session_controller.block_start_indices.get(current_block_idx, 0)
+        current_idx = self.session_controller.current_image_index
+        
+        # Get all images for this block (from start to current)
+        block_images = []
+        for i in range(block_start, current_idx + 1):
+            if i < len(self.session_controller.image_history):
+                img_path = self.session_controller.image_history[i]
+                if img_path:  # Skip None (break images)
+                    block_images.append(img_path)
+        
+        if not block_images:
+            return
+        
+        # Open history dialog
+        ImageHistoryDialog(self, block_images, current_idx - block_start)
+    
     def open_settings(self):
         """Open settings dialog with keyboard shortcuts"""
         SettingsDialog(self, self.shortcuts_manager)
@@ -895,6 +951,9 @@ class MainWindow(ctk.CTk):
         # Hide start button IMMEDIATELY before any heavy work
         self.start_button.pack_forget()
         
+        # Show history button
+        self.history_button.pack(side="left")
+        
         # Force UI update so buttons disappear right away
         self.update_idletasks()
         
@@ -945,6 +1004,186 @@ class MainWindow(ctk.CTk):
     
     def run(self):
         self.mainloop()
+
+
+class ImageHistoryDialog(ctk.CTkToplevel):
+    """Dialog showing all images from current block"""
+    
+    def __init__(self, parent, images: list, current_index: int):
+        super().__init__(parent)
+        
+        self.parent_window = parent
+        self.images = images
+        self.current_index = current_index
+        
+        # Dialog setup
+        self.title("Image History - Current Block")
+        self.geometry("900x700")
+        
+        # Make modal
+        self.transient(parent)
+        self.grab_set()
+        
+        # Colors
+        CYBER_DARK = "#0f0f0f"
+        CYBER_GRAY = "#1f1f1f"
+        CYBER_BLUE = "#67E8F9"
+        CYBER_PINK = "#FF6EC7"
+        CYBER_TEXT = "#E5E5E5"
+        
+        self.configure(fg_color=CYBER_DARK)
+        
+        # Main frame
+        main_frame = ctk.CTkFrame(self, fg_color=CYBER_DARK)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Header
+        header = ctk.CTkLabel(
+            main_frame,
+            text=f"📜 Image History ({len(images)} images in this block)",
+            font=("Arial", 18, "bold"),
+            text_color=CYBER_BLUE
+        )
+        header.pack(pady=(0, 15))
+        
+        # Scrollable frame for images
+        scroll_frame = ctk.CTkScrollableFrame(
+            main_frame,
+            fg_color=CYBER_GRAY
+        )
+        scroll_frame.pack(fill="both", expand=True, pady=(0, 15))
+        
+        # Display images in a grid
+        for idx, img_path in enumerate(images):
+            try:
+                # Create frame for each image, clickable
+                img_frame = ctk.CTkFrame(scroll_frame, fg_color=CYBER_GRAY, corner_radius=8)
+                img_frame.grid(row=idx//3, column=idx%3, padx=10, pady=10, sticky="nsew")
+                
+                # Make frame clickable
+                img_frame.bind("<Button-1>", lambda e, index=idx: self.jump_to_image(index))
+                img_frame.bind("<Enter>", lambda e, frame=img_frame: frame.configure(fg_color="#3a3a3a"))
+                img_frame.bind("<Leave>", lambda e, frame=img_frame: frame.configure(fg_color=CYBER_GRAY))
+                
+                # Load and resize image
+                pil_image = Image.open(img_path)
+                pil_image.thumbnail((250, 250), Image.Resampling.LANCZOS)
+                
+                ctk_image = ctk.CTkImage(
+                    light_image=pil_image,
+                    dark_image=pil_image,
+                    size=pil_image.size
+                )
+                
+                # Image label
+                img_label = ctk.CTkLabel(
+                    img_frame,
+                    image=ctk_image,
+                    text="",
+                    cursor="hand2"
+                )
+                img_label.pack(padx=5, pady=5)
+                
+                # Make image label also clickable
+                img_label.bind("<Button-1>", lambda e, index=idx: self.jump_to_image(index))
+                
+                # Image number and indicator
+                is_current = (idx == current_index)
+                number_text = f"#{idx + 1}" + (" ← Current" if is_current else "")
+                number_color = CYBER_PINK if is_current else CYBER_TEXT
+                
+                number_label = ctk.CTkLabel(
+                    img_frame,
+                    text=number_text,
+                    font=("Arial", 11, "bold" if is_current else "normal"),
+                    text_color=number_color,
+                    cursor="hand2"
+                )
+                number_label.pack(pady=(0, 5))
+                
+                # Make number label clickable
+                number_label.bind("<Button-1>", lambda e, index=idx: self.jump_to_image(index))
+                
+            except Exception as e:
+                # If image fails to load, show placeholder
+                error_label = ctk.CTkLabel(
+                    scroll_frame,
+                    text=f"❌ Failed to load\n{img_path.name}",
+                    font=("Arial", 10),
+                    text_color="#FF3333"
+                )
+                error_label.grid(row=idx//3, column=idx%3, padx=10, pady=10)
+        
+        # Configure grid columns to be equal width
+        for col in range(3):
+            scroll_frame.grid_columnconfigure(col, weight=1, uniform="images")
+        
+        # Close button
+        close_btn = ctk.CTkButton(
+            main_frame,
+            text="Close",
+            command=self.destroy,
+            font=("Arial", 13, "bold"),
+            fg_color=CYBER_BLUE,
+            hover_color=CYBER_PINK,
+            width=120,
+            height=35
+        )
+        close_btn.pack()
+    
+    def jump_to_image(self, index: int):
+        """Add selected image as new entry in history (doesn't remove newer ones)"""
+        # Get the absolute index in image history
+        block_start = self.parent_window.session_controller.block_start_indices.get(
+            self.parent_window.session_controller.current_block_index, 0
+        )
+        absolute_index = block_start + index
+        
+        # Get the image path we want to revisit
+        image_path = self.parent_window.session_controller.image_history[absolute_index]
+        
+        # Add this image as a NEW entry at the end of history
+        self.parent_window.session_controller.image_history.append(image_path)
+        self.parent_window.session_controller.current_image_index = len(
+            self.parent_window.session_controller.image_history
+        ) - 1
+        
+        # Update block's last index
+        self.parent_window.session_controller.block_last_indices[
+            self.parent_window.session_controller.current_block_index
+        ] = self.parent_window.session_controller.current_image_index
+        
+        # Get current block
+        block = self.parent_window.session_controller.session.blocks[
+            self.parent_window.session_controller.current_block_index
+        ]
+        
+        # Reset timer and restart timer thread
+        self.parent_window.session_controller.remaining = block.duration
+        self.parent_window.session_controller.block_start_time = __import__('time').time()
+        
+        # Restart timer thread
+        self.parent_window.session_controller._current_thread_id += 1
+        thread_id = self.parent_window.session_controller._current_thread_id
+        
+        import threading
+        self.parent_window.session_controller._timer_thread = threading.Thread(
+            target=self.parent_window.session_controller._timer_loop,
+            args=(thread_id, block.duration),
+            daemon=True
+        )
+        self.parent_window.session_controller._timer_thread.start()
+        
+        # Update GUI
+        if self.parent_window.session_controller.on_new_block:
+            self.parent_window.session_controller.on_new_block(
+                self.parent_window.session_controller.current_block_index,
+                block,
+                image_path
+            )
+        
+        # Close the dialog
+        self.destroy()
 
 
 if __name__ == "__main__":

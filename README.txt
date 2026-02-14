@@ -9,11 +9,17 @@ FEATURES
 ================================================================================
 
 * No Repeated Images - Shows all images before repeating
+* Image History Viewer - Review and revisit poses from current block
 * Adjustable Sound Volume - Warning chime and transition sounds
+* Custom Sound Files - Use your own sound effects
 * Smart Timer - Automatically advances to next pose
 * Keyboard Shortcuts - Fully customizable controls
 * Fullscreen Mode - Distraction-free drawing
 * Session Builder - Create custom practice sessions
+* Preset Sessions - Save and load your favorite session configurations
+* Theme Support - Choose between Cyberpunk and Matcha Latte themes
+* Folder Tags - See which subfolder each image is from
+* Session Naming - Name your sessions for better organization
 
 ================================================================================
 HOW TO USE
@@ -26,18 +32,15 @@ HOW TO USE
    - Choose any folder on your computer that contains your images
    - You can organize images into subfolders (e.g., hands\, poses\, anatomy\)
 
-2. Add Sound Files (Optional)
-   - Place warning.wav in assets\ folder (plays when time is running out)
-   - Place transition.wav in assets\ folder (plays when changing poses)
-
 --- CREATING A SESSION ---
 
 1. Click the "Start" button
-2. Choose folders with your reference images
-3. Add blocks:
+2. Enter a session name (optional - used when saving presets)
+3. Choose folders with your reference images
+4. Add blocks:
    - Pose blocks - Timed drawing sessions
    - Break blocks - Rest periods
-4. Click "Start Session"
+5. Click "Start Session" or "Save as Preset" to reuse later
 
 --- DURING A SESSION ---
 
@@ -48,60 +51,38 @@ Keyboard Controls:
 * Escape - Exit fullscreen
 * F11 - Toggle fullscreen
 
+UI Controls:
+* 📜 History Button - View all images from current block, click to revisit
+* ⚙️ Settings Button - Adjust volume, sounds, theme, shortcuts
+* ⛶ Fullscreen Button - Toggle fullscreen mode
+* Folder Tag - Shows which subfolder the current image is from
+
 --- SETTINGS ---
 
 Click the Settings button (gear icon) to:
-* Adjust sound volumes
+* Adjust sound volumes (warning and transition)
+* Choose custom sound files (.wav format)
+* Select theme (Cyberpunk or Matcha Latte)
 * Customize keyboard shortcuts
-* Configure preferences
+* Change reference folder location
 
-================================================================================
-FOLDER STRUCTURE
-================================================================================
+--- THEMES ---
 
-CroquisCadence\
-├── CroquisCadence.exe       <-- Run this!
-├── README.txt               (this file)
-├── assets\
-│   ├── break_image.png      (default break screen)
-│   ├── warning.wav          (add your own)
-│   └── transition.wav       (add your own)
-└── settings\
-    ├── app_settings.json    (stores reference folder path)
-    ├── keyboard_shortcuts.json
-    └── volume.json
+CroquisCadence supports two beautiful themes:
+* Cyberpunk - Dark with pink, blue, and purple accents
+* Matcha Latte - Dark with warm greens and cream tones (default)
 
-Your reference images can be ANYWHERE on your computer!
-Just select the folder on first launch.
+Change themes in Settings. Restart the app to see changes.
 
-================================================================================
-SOUND FILES
-================================================================================
+--- TIMER COLOR MEANINGS ---
 
-Free sound resources:
-* Freesound.org
-* Mixkit.co/free-sound-effects
-* Zapsplat.com
-
-Search for:
-* "soft chime" or "bell" for warning sound
-* "click" or "whoosh" for transition sound
-
-Keep sounds short (less than 1 second) and subtle!
-
-================================================================================
-TIPS
-================================================================================
-
-Timer Colors:
+Cyberpunk Theme:
 * Pink = Normal time
-* Red = Last 10% of block (warning zone)
+* Pink = Warning zone (last 10% of block)
 
-Best Practices:
-* Start with short sessions (5-10 minutes)
-* Mix different pose durations (30s, 1m, 5m)
-* Take breaks between blocks
-* Use fullscreen for focus
+Matcha Latte Theme:
+* Warm tan/cream = Normal time
+* Bright orange = Warning zone (last 10% of block)
 
 ================================================================================
 TROUBLESHOOTING
@@ -118,17 +99,50 @@ Want to change reference folder?
 * Restart the app
 
 No sound?
-* Check that warning.wav and transition.wav exist in assets\ folder
+* Check that bell.wav and page_turn_stiff.wav exist in assets\ folder
 * Adjust volume in Settings (might be set to 0%)
+* You can choose custom sound files in Settings
 
 Keyboard shortcuts not working?
 * Open Settings and check/reset shortcuts
 * Restart app after changing shortcuts
 
+Theme not changing?
+* Make sure to restart the app after changing themes
+* Theme settings are saved in settings\theme.json
+
+================================================================================
+CHANGELOG
 ================================================================================
 
-Created for artists who want a distraction-free figure drawing practice tool.
+Version 1.1.0:
+* Added theme system (Cyberpunk and Matcha Latte themes)
+* Added image history viewer - click 📜 to see all poses from current block
+* Added ability to jump back to previous images in history
+* Added folder tags showing which subfolder each image is from
+* Added session naming for better preset organization
+* Added custom sound file selection
+* Updated default sounds (bell.wav for warning, page_turn_stiff.wav for transition)
+* Changed default transition volume to 100%
+* Made Matcha Latte the default theme
+* Improved timer color theming (theme-aware colors)
+* All UI elements now respect theme colors
+
+Version 1.0.0:
+* Initial release
+* Core timer functionality
+* Session builder with custom blocks
+* Keyboard shortcuts
+* Sound effects
+* Fullscreen mode
+
+================================================================================
+
+Created for artists who want to use their own reference photos for 
+figure drawing practice!
 
 Enjoy your practice sessions!
+
+- ChisuyaSoo
 
 ================================================================================

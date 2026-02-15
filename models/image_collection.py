@@ -7,6 +7,16 @@
 from pathlib import Path
 from typing import List, Set, Optional
 import random
+import os
+
+def is_nsfw_image(filepath: Path) -> bool:
+    """
+    Check if image is tagged as NSFW based on filename.
+    Returns True if filename contains '_nsfw' (case-insensitive).
+    """
+    filename = os.path.basename(str(filepath)).lower()
+    return '_nsfw' in filename
+
 
 class ImageCollection:
     """Manages reference images with folder-based tagging"""
@@ -94,29 +104,38 @@ class ImageCollection:
     def get_random_image(
             self, 
             folder_names: Optional[List[str]] = None, 
-            exclude: Optional[Path] = None
+            exclude: Optional[Path] = None,
+            nsfw_filter: str = "all"
             ) -> Path:
         """
-        Get one random image fm specified folder
+        Get one random image from specified folders with NSFW filtering.
         
-        :param self: Description
-        :param folder_names: Description
-        :type folder_names: List[str]
-        :return: Description
-        :rtype: Path
+        :param folder_names: List of folder names to select from (None = all folders)
+        :param exclude: Image path to exclude from selection
+        :param nsfw_filter: Filter mode - "all" (default), "sfw", or "nsfw"
+        :return: Random image path
         """
         if folder_names:
             candidates = self.get_images_by_folders(folder_names)
         else:
             candidates = self.images.copy()
         
+        # Apply NSFW filter
+        if nsfw_filter == "sfw":
+            # Only SFW images (no _nsfw in filename)
+            candidates = [img for img in candidates if not is_nsfw_image(img)]
+        elif nsfw_filter == "nsfw":
+            # Only NSFW images (_nsfw in filename)
+            candidates = [img for img in candidates if is_nsfw_image(img)]
+        # If "all", don't filter
+        
         if exclude and exclude in candidates:
             candidates.remove(exclude)
 
         if len(candidates) == 0:
             if folder_names:
-                raise ValueError(f"Error, no images found in folders: {folder_names}")
+                raise ValueError(f"Error, no images found in folders: {folder_names} with filter: {nsfw_filter}")
             else:
-                raise ValueError("No images found in collection")
+                raise ValueError(f"No images found in collection with filter: {nsfw_filter}")
         
         return random.choice(candidates)

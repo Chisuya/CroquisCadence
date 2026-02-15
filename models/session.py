@@ -19,6 +19,7 @@ class SessionBlock:
     # defaults to none
     folder_paths: Optional[List[str]] = None
     interval_pings: Optional[List[int]] = None
+    nsfw_filter: str = "all"  # "all", "sfw", or "nsfw"
     
     def __post_init__(self):
         """Validation after initialization"""

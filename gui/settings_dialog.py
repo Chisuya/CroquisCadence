@@ -347,10 +347,10 @@ class SettingsDialog(ctk.CTkToplevel):
         )
         canvas_label.pack(side="left", padx=(0, 10))
         
-        # Get current canvas color
-        from theme_config import get_theme
+        # Get current canvas color (check override first)
+        from theme_config import get_theme, get_canvas_bg
         current_theme = get_theme(load_current_theme())
-        current_canvas_color = current_theme.get("canvas_bg", "#808080")
+        current_canvas_color = get_canvas_bg(current_theme)  # checks override first
         
         # Color preview button
         self.canvas_color_btn = ctk.CTkButton(

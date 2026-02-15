@@ -515,9 +515,13 @@ class MainWindow(ctk.CTk):
         )
         self.image_canvas.pack(fill="both", expand=True)
         
+        # Bind right-click for image tagging
+        self.image_canvas.bind("<Button-3>", self.show_image_context_menu)
+        
         # Store canvas image reference
         self.canvas_image_id = None
         self.canvas_image_ref = None
+        self.current_image_path = None  # Track current image for tagging
     
     def handle_new_block(self, block_index, block, image_path, is_auto=False):
         """Called when a new block starts
@@ -933,6 +937,87 @@ class MainWindow(ctk.CTk):
                 text_color=self.theme["text"]
             )
     
+    def show_image_context_menu(self, event):
+        """Show right-click menu for image tagging"""
+        if not self.current_image_path:
+            return
+        
+        import tkinter as tk
+        menu = tk.Menu(self, tearoff=0)
+        
+        # Check current NSFW status
+        filename = os.path.basename(str(self.current_image_path))
+        is_nsfw = '_nsfw' in filename.lower()
+        
+        if is_nsfw:
+            menu.add_command(
+                label="✓ Tagged as NSFW",
+                state="disabled"
+            )
+            menu.add_command(
+                label="Remove NSFW tag",
+                command=self.tag_image_sfw
+            )
+        else:
+            menu.add_command(
+                label="✓ Tagged as SFW",
+                state="disabled"
+            )
+            menu.add_command(
+                label="Tag as NSFW",
+                command=self.tag_image_nsfw
+            )
+        
+        menu.post(event.x_root, event.y_root)
+    
+    def tag_image_nsfw(self):
+        """Rename file to add _nsfw tag"""
+        if not self.current_image_path:
+            return
+        
+        filepath = Path(self.current_image_path)
+        filename = filepath.stem
+        extension = filepath.suffix
+        
+        # Don't add if already tagged
+        if '_nsfw' in filename.lower():
+            return
+        
+        # New filename with _nsfw
+        new_filename = f"{filename}_nsfw{extension}"
+        new_filepath = filepath.parent / new_filename
+        
+        try:
+            filepath.rename(new_filepath)
+            # Update current path
+            self.current_image_path = new_filepath
+            print(f"Tagged as NSFW: {new_filename}")
+        except Exception as e:
+            print(f"Error tagging image: {e}")
+    
+    def tag_image_sfw(self):
+        """Rename file to remove _nsfw tag"""
+        if not self.current_image_path:
+            return
+        
+        filepath = Path(self.current_image_path)
+        filename = filepath.stem
+        extension = filepath.suffix
+        
+        # Remove _nsfw from filename (case-insensitive)
+        import re
+        new_filename_stem = re.sub(r'_nsfw', '', filename, flags=re.IGNORECASE)
+        new_filename = f"{new_filename_stem}{extension}"
+        new_filepath = filepath.parent / new_filename
+        
+        try:
+            filepath.rename(new_filepath)
+            # Update current path
+            self.current_image_path = new_filepath
+            print(f"Tagged as SFW: {new_filename}")
+        except Exception as e:
+            print(f"Error tagging image: {e}")
+    
     def toggle_fullscreen(self):
         """Toggle fullscreen mode"""
         self.is_fullscreen = not self.is_fullscreen
@@ -955,6 +1040,9 @@ class MainWindow(ctk.CTk):
 
     def display_image(self, image_path: Path):
         """Display an image on canvas, scaled to fit available space"""
+        # Store current image path for right-click tagging
+        self.current_image_path = image_path
+        
         # Force UI update FIRST so buttons appear immediately
         self.update_idletasks()
         

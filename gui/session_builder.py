@@ -54,6 +54,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         self.blocks: List[SessionBlock] = []
         self.result: Optional[Session] = None
         self.parent_window = parent
+        self.current_nsfw_filter = "all"  # Track NSFW filter selection
         
         # Load theme colors
         from theme_config import get_theme, load_current_theme
@@ -468,18 +469,24 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             
             # Get folder selection
             folder_paths = None
+            nsfw_filter = "all"  # Default
             if block_type == "pose":
                 if self.all_folders_selected:
                     folder_paths = None
                 else:
                     folder_paths = sorted(list(self.selected_folders_set)) if self.selected_folders_set else None
+                
+                # Get NSFW filter setting (from folder selection dialog if opened)
+                nsfw_filter = getattr(self, 'current_nsfw_filter', "all")
+                print(f"[SessionBuilder] Creating block with nsfw_filter: {nsfw_filter}")  # Debug
             
             # Create block
             block = SessionBlock(
                 block_type=block_type,
                 duration=duration_seconds,
                 count=count,
-                folder_paths=folder_paths
+                folder_paths=folder_paths,
+                nsfw_filter=nsfw_filter
             )
             
             # Add to list
@@ -864,13 +871,15 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         
         expanded_blocks = []
         for block in self.blocks:
+            print(f"[SessionBuilder] Expanding block with nsfw_filter: {block.nsfw_filter}")  # Debug
             for _ in range(block.count):
                 expanded_blocks.append(
                     SessionBlock(
                         block_type=block.block_type,
                         duration=block.duration,
                         count=1,
-                        folder_paths=block.folder_paths
+                        folder_paths=block.folder_paths,
+                        nsfw_filter=block.nsfw_filter
                     )
                 )
         self.result = Session(name=name, blocks=expanded_blocks)
@@ -1057,6 +1066,11 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         """Called when block folders are updated from edit dialog"""
         if 0 <= block_idx < len(self.blocks):
             self.blocks[block_idx].folder_paths = new_folder_paths
+            # Also update nsfw_filter from current selection
+            new_filter = getattr(self, 'current_nsfw_filter', 'all')
+            self.blocks[block_idx].nsfw_filter = new_filter
+            print(f"[SessionBuilder] Updated block {block_idx} nsfw_filter to: {new_filter}")  # Debug
+            print(f"[SessionBuilder] Block now has: {self.blocks[block_idx].nsfw_filter}")  # Debug
             self.refresh_blocks_list()
 
 class SavePresetDialog(ctk.CTkToplevel):
@@ -1308,7 +1322,7 @@ class EditFoldersDialog(ctk.CTkToplevel):
         
         # Dialog setup
         self.title(f"Edit Folders - Block {block_idx + 1}")
-        self.geometry("500x650")
+        self.geometry("500x750")
         self.resizable(False, False)
         
         # Make it modal
@@ -1319,7 +1333,7 @@ class EditFoldersDialog(ctk.CTkToplevel):
         self.update_idletasks()
         
         dialog_width = 500
-        dialog_height = 650
+        dialog_height = 750  # Increased from 650
         
         parent_x = parent.winfo_x()
         parent_y = parent.winfo_y()
@@ -1359,13 +1373,11 @@ class EditFoldersDialog(ctk.CTkToplevel):
         self.CYBER_GRAY = theme["gray"]
         self.CYBER_LIGHT_GRAY = theme["light_gray"]
         self.CYBER_TEXT = theme["text"]
-        # Calculate text colors based on button backgrounds
+        # Calculate appropriate text colors based on button backgrounds
         from theme_config import get_text_color_for_bg
         self.CYBER_TEXT_PRIMARY = get_text_color_for_bg(self.CYBER_PINK)     # Text for primary buttons
         self.CYBER_TEXT_SECONDARY = get_text_color_for_bg(self.CYBER_BLUE)   # Text for secondary buttons
         self.CYBER_TEXT_ACCENT = get_text_color_for_bg(self.CYBER_PURPLE)    # Text for accent buttons
-        
-        self.configure(fg_color=self.CYBER_DARK)
 
         self.configure(fg_color=self.CYBER_DARK)
         
@@ -1427,6 +1439,63 @@ class EditFoldersDialog(ctk.CTkToplevel):
             width=70,
             height=22
         )
+        
+        # NSFW Filter Section
+        filter_frame = ctk.CTkFrame(folders_frame, fg_color=self.CYBER_DARK, corner_radius=6)
+        filter_frame.pack(fill="x", padx=15, pady=(0, 10))
+        
+        ctk.CTkLabel(
+            filter_frame,
+            text="🏷️ Image Filter:",
+            font=("Arial", 11, "bold"),
+            text_color=self.CYBER_BLUE
+        ).pack(side="left", padx=(10, 15), pady=8)
+        
+        # NSFW filter variable - load from block
+        initial_filter = getattr(self.block, 'nsfw_filter', 'all')  # Get from block or default to 'all'
+        self.nsfw_filter = ctk.StringVar(value=initial_filter)
+        
+        filter_options_frame = ctk.CTkFrame(filter_frame, fg_color="transparent")
+        filter_options_frame.pack(side="left", padx=5, pady=5)
+        
+        ctk.CTkRadioButton(
+            filter_options_frame,
+            text="All Images",
+            variable=self.nsfw_filter,
+            value="all",
+            font=("Arial", 10),
+            text_color=self.CYBER_TEXT,
+            fg_color=self.CYBER_PURPLE,
+            hover_color=self.CYBER_PINK,
+            radiobutton_width=16,
+            radiobutton_height=16
+        ).pack(side="left", padx=5)
+        
+        ctk.CTkRadioButton(
+            filter_options_frame,
+            text="SFW Only",
+            variable=self.nsfw_filter,
+            value="sfw",
+            font=("Arial", 10),
+            text_color=self.CYBER_TEXT,
+            fg_color=self.CYBER_PURPLE,
+            hover_color=self.CYBER_PINK,
+            radiobutton_width=16,
+            radiobutton_height=16
+        ).pack(side="left", padx=5)
+        
+        ctk.CTkRadioButton(
+            filter_options_frame,
+            text="NSFW Only",
+            variable=self.nsfw_filter,
+            value="nsfw",
+            font=("Arial", 10),
+            text_color=self.CYBER_TEXT,
+            fg_color=self.CYBER_PURPLE,
+            hover_color=self.CYBER_PINK,
+            radiobutton_width=16,
+            radiobutton_height=16
+        ).pack(side="left", padx=5)
         
         # Selected tags, scrollable
         selected_tags_container = ctk.CTkFrame(
@@ -1661,6 +1730,11 @@ class EditFoldersDialog(ctk.CTkToplevel):
             new_folder_paths = None
         else:
             new_folder_paths = sorted(list(self.selected_folders_set)) if self.selected_folders_set else None
+        
+        # Save NSFW filter to parent
+        selected_filter = self.nsfw_filter.get()
+        self.parent_window.current_nsfw_filter = selected_filter
+        print(f"[EditFoldersDialog] Saving NSFW filter: {selected_filter}")  # Debug
         
         self.on_update_callback(self.block_idx, new_folder_paths)
         self.grab_release()

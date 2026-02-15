@@ -32,7 +32,7 @@ class SettingsDialog(ctk.CTkToplevel):
         from theme_config import get_theme, load_current_theme
         theme = get_theme(load_current_theme())
         
-        # Colors (match theme)
+        # Colors (match your theme)
         self.CYBER_PINK = theme["primary"]
         self.CYBER_PURPLE = theme["accent"]
         self.CYBER_BLUE = theme["secondary"]
@@ -42,6 +42,11 @@ class SettingsDialog(ctk.CTkToplevel):
         self.CYBER_GRAY = theme["gray"]
         self.CYBER_LIGHT_GRAY = theme["light_gray"]
         self.CYBER_TEXT = theme["text"]
+        # Calculate appropriate text colors based on button backgrounds
+        from theme_config import get_text_color_for_bg
+        self.CYBER_TEXT_PRIMARY = get_text_color_for_bg(theme["primary"])
+        self.CYBER_TEXT_SECONDARY = get_text_color_for_bg(theme["secondary"])
+        self.CYBER_TEXT_ACCENT = get_text_color_for_bg(theme["accent"])
         
         self.configure(fg_color=self.CYBER_DARK)
         
@@ -78,37 +83,23 @@ class SettingsDialog(ctk.CTkToplevel):
     
     def create_widgets(self):
         """Build the settings UI"""
-        main_frame = ctk.CTkFrame(self, fg_color=self.CYBER_DARK)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        self.main_frame = ctk.CTkFrame(self, fg_color=self.CYBER_DARK)
+        self.main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         # Header
         header = ctk.CTkLabel(
-            main_frame,
+            self.main_frame,
             text="⚙ Settings",
             font=("Arial", 20, "bold"),
             text_color=self.CYBER_BLUE
         )
         header.pack(pady=(0, 20))
         
-        # Scrollable content area
-        self.content_frame = ctk.CTkScrollableFrame(
-            main_frame,
-            fg_color=self.CYBER_GRAY,
-            height=250
-        )
-        self.content_frame.pack(fill="both", expand=True, pady=(0, 15))
-        
-        # Volume settings section
-        self.create_volume_section()
-        
-        # Theme selection section
-        self.create_theme_section()
-        
-        # Keyboard shortcuts section
-        self.create_shortcuts_section()
+        # Create all content
+        self.create_content_frame()
         
         # Restart notification area (placeholder)
-        self.restart_notice_container = ctk.CTkFrame(main_frame, fg_color=self.CYBER_DARK, height=0)
+        self.restart_notice_container = ctk.CTkFrame(self.main_frame, fg_color=self.CYBER_DARK, height=0)
         self.restart_notice_container.pack(fill="x", pady=(0, 15))
         
         # Actual restart notification
@@ -128,7 +119,7 @@ class SettingsDialog(ctk.CTkToplevel):
         self.restart_notice_label.pack(padx=15, pady=8)
         
         # Buttons at bottom
-        button_frame = ctk.CTkFrame(main_frame, fg_color=self.CYBER_DARK)
+        button_frame = ctk.CTkFrame(self.main_frame, fg_color=self.CYBER_DARK)
         button_frame.pack(fill="x")
         
         close_btn = ctk.CTkButton(
@@ -180,7 +171,6 @@ class SettingsDialog(ctk.CTkToplevel):
             warning_frame,
             text="⚠️ Warning Sound:",
             font=("Arial", 12),
-            text_color=self.CYBER_TEXT
         )
         warning_label.pack(side="left", padx=(0, 10))
         
@@ -214,7 +204,6 @@ class SettingsDialog(ctk.CTkToplevel):
             transition_frame,
             text="🔔 Transition Sound:",
             font=("Arial", 12),
-            text_color=self.CYBER_TEXT
         )
         transition_label.pack(side="left", padx=(0, 10))
         
@@ -240,10 +229,10 @@ class SettingsDialog(ctk.CTkToplevel):
         self.transition_slider.set(volumes['transition'])
         self.transition_slider.pack(fill="x", padx=15, pady=(0, 15))
         
-        # Sound file selection
+        # Sound file selection (transition only - warnings set in Warning Points section)
         sound_file_header = ctk.CTkLabel(
             volume_container,
-            text="Sound Files:",
+            text="Transition Sound File:",
             font=("Arial", 12, "bold"),
             text_color=self.CYBER_TEXT
         )
@@ -252,8 +241,7 @@ class SettingsDialog(ctk.CTkToplevel):
         # Load current sound paths
         sound_file = Path("settings/sounds.json")
         default_sounds = {
-            "warning": "assets/bell.wav",
-            "transition": "assets/page_turn_stiff.wav"
+            "transition": "assets/Universfield_messageincoming2.wav"
         }
         
         if sound_file.exists():
@@ -261,41 +249,6 @@ class SettingsDialog(ctk.CTkToplevel):
                 sound_paths = json.load(f)
         else:
             sound_paths = default_sounds
-        
-        # Warning sound file
-        warning_file_frame = ctk.CTkFrame(volume_container, fg_color="transparent")
-        warning_file_frame.pack(fill="x", padx=15, pady=5)
-        
-        warning_file_label = ctk.CTkLabel(
-            warning_file_frame,
-            text="⚠️ Warning:",
-            font=("Arial", 11),
-            text_color=self.CYBER_TEXT,
-            width=80
-        )
-        warning_file_label.pack(side="left")
-        
-        warning_filename = Path(sound_paths.get('warning', default_sounds['warning'])).name
-        self.warning_file_display = ctk.CTkLabel(
-            warning_file_frame,
-            text=warning_filename,
-            font=("Arial", 10),
-            text_color=self.CYBER_PINK,
-            anchor="w"
-        )
-        self.warning_file_display.pack(side="left", padx=10, fill="x", expand=True)
-        
-        warning_browse_btn = ctk.CTkButton(
-            warning_file_frame,
-            text="Browse...",
-            command=lambda: self.browse_sound_file("warning"),
-            width=80,
-            height=25,
-            font=("Arial", 10),
-            fg_color=self.CYBER_PURPLE,
-            hover_color=self.CYBER_PINK
-        )
-        warning_browse_btn.pack(side="right")
         
         # Transition sound file
         transition_file_frame = ctk.CTkFrame(volume_container, fg_color="transparent")
@@ -328,6 +281,7 @@ class SettingsDialog(ctk.CTkToplevel):
             height=25,
             font=("Arial", 10),
             fg_color=self.CYBER_PURPLE,
+            text_color=self.CYBER_TEXT_ACCENT,
             hover_color=self.CYBER_PINK
         )
         transition_browse_btn.pack(side="right")
@@ -357,39 +311,102 @@ class SettingsDialog(ctk.CTkToplevel):
         )
         
         if file_path:
-            # Update the display
+            # Update the display (only transition now)
             filename = Path(file_path).name
-            if sound_type == "warning":
-                self.warning_file_display.configure(text=filename)
-            else:
-                self.transition_file_display.configure(text=filename)
+            self.transition_file_display.configure(text=filename)
             
             # Store the path
             self.sound_paths[sound_type] = file_path
     
     def create_theme_section(self):
         """Create theme selection radio buttons"""
-        from theme_config import load_current_theme, THEMES
+        from theme_config import load_current_theme, get_all_theme_names, THEMES, load_custom_themes
         
-        theme_container = ctk.CTkFrame(self.content_frame, fg_color=self.CYBER_LIGHT_GRAY, corner_radius=8)
-        theme_container.pack(fill="x", padx=10, pady=10)
+        # Store reference to theme container for easy refresh
+        self.theme_container = ctk.CTkFrame(self.content_frame, fg_color=self.CYBER_LIGHT_GRAY, corner_radius=8)
+        self.theme_container.pack(fill="x", padx=10, pady=10)
         
         # Header
         theme_header = ctk.CTkLabel(
-            theme_container,
+            self.theme_container,
             text="🎨 Theme",
             font=("Arial", 14, "bold"),
             text_color=self.CYBER_BLUE
         )
         theme_header.pack(pady=(15, 10), padx=15, anchor="w")
         
+        # Canvas Background Color Picker (Quick Access)
+        canvas_bg_frame = ctk.CTkFrame(self.theme_container, fg_color="transparent")
+        canvas_bg_frame.pack(fill="x", padx=15, pady=(0, 15))
+        
+        canvas_label = ctk.CTkLabel(
+            canvas_bg_frame,
+            text="🖼️ Canvas Background:",
+            font=("Arial", 12),
+            text_color=self.CYBER_TEXT
+        )
+        canvas_label.pack(side="left", padx=(0, 10))
+        
+        # Get current canvas color
+        from theme_config import get_theme
+        current_theme = get_theme(load_current_theme())
+        current_canvas_color = current_theme.get("canvas_bg", "#808080")
+        
+        # Color preview button
+        self.canvas_color_btn = ctk.CTkButton(
+            canvas_bg_frame,
+            text="",
+            command=self.change_canvas_color,
+            fg_color=current_canvas_color,
+            hover_color=current_canvas_color,
+            width=40,
+            height=25
+        )
+        self.canvas_color_btn.pack(side="left", padx=5)
+        
+        # Hex code display
+        self.canvas_hex_label = ctk.CTkLabel(
+            canvas_bg_frame,
+            text=current_canvas_color,
+            font=("Arial", 11),
+            text_color=self.CYBER_TEXT
+        )
+        self.canvas_hex_label.pack(side="left", padx=5)
+        
+        # Reset to 50% gray button
+        reset_canvas_btn = ctk.CTkButton(
+            canvas_bg_frame,
+            text="Reset to 50% Gray",
+            command=lambda: self.set_canvas_color("#808080"),
+            font=("Arial", 10),
+            fg_color=self.CYBER_GRAY,
+            hover_color=self.CYBER_LIGHT_GRAY,
+            text_color=self.CYBER_TEXT,
+            width=120,
+            height=25
+        )
+        reset_canvas_btn.pack(side="left", padx=5)
+        
+        # Separator
+        separator = ctk.CTkFrame(self.theme_container, fg_color=self.CYBER_GRAY, height=1)
+        separator.pack(fill="x", padx=15, pady=(0, 10))
+        
         # Load current theme
         current_theme = load_current_theme()
         self.selected_theme = ctk.StringVar(value=current_theme)
         
-        # Theme options
-        themes_frame = ctk.CTkFrame(theme_container, fg_color="transparent")
-        themes_frame.pack(fill="x", padx=15, pady=(0, 15))
+        # Theme options frame
+        themes_frame = ctk.CTkFrame(self.theme_container, fg_color="transparent")
+        themes_frame.pack(fill="x", padx=15, pady=(0, 10))
+        
+        # Preset themes
+        preset_label = ctk.CTkLabel(
+            themes_frame,
+            text="Preset Themes:",
+            font=("Arial", 11, "bold"),
+            text_color=self.CYBER_TEXT
+        )
+        preset_label.pack(anchor="w", pady=(0, 5))
         
         for theme_key, theme_data in THEMES.items():
             radio_btn = ctk.CTkRadioButton(
@@ -398,19 +415,428 @@ class SettingsDialog(ctk.CTkToplevel):
                 variable=self.selected_theme,
                 value=theme_key,
                 font=("Arial", 12),
-                text_color=self.CYBER_TEXT,
                 fg_color=self.CYBER_PURPLE,
+                text_color=self.CYBER_TEXT_ACCENT,
                 hover_color=self.CYBER_PINK,
                 radiobutton_width=20,
                 radiobutton_height=20,
                 command=self.on_theme_changed
             )
-            radio_btn.pack(anchor="w", pady=5)
+            radio_btn.pack(anchor="w", pady=3)
+        
+        # Custom themes
+        custom_themes = load_custom_themes()
+        if custom_themes:
+            custom_label = ctk.CTkLabel(
+                themes_frame,
+                text="Custom Themes:",
+                font=("Arial", 11, "bold"),
+                text_color=self.CYBER_TEXT
+            )
+            custom_label.pack(anchor="w", pady=(10, 5))
+            
+            for theme_key, theme_data in custom_themes.items():
+                theme_frame = ctk.CTkFrame(themes_frame, fg_color="transparent")
+                theme_frame.pack(anchor="w", fill="x", pady=2)
+                
+                radio_btn = ctk.CTkRadioButton(
+                    theme_frame,
+                    text=theme_data.get("name", theme_key),
+                    variable=self.selected_theme,
+                    value=theme_key,
+                    font=("Arial", 12),
+                    fg_color=self.CYBER_PURPLE,
+                    text_color=self.CYBER_TEXT_ACCENT,
+                    hover_color=self.CYBER_PINK,
+                    radiobutton_width=20,
+                    radiobutton_height=20,
+                    command=self.on_theme_changed
+                )
+                radio_btn.pack(side="left")
+                
+                # Delete custom theme button
+                delete_btn = ctk.CTkButton(
+                    theme_frame,
+                    text="✕",
+                    command=lambda tk=theme_key: self.delete_custom_theme(tk),
+                    font=("Arial", 12, "bold"),
+                    fg_color="transparent",
+                    hover_color="#ff4444",
+                    text_color=self.CYBER_TEXT,
+                    width=25,
+                    height=20
+                )
+                delete_btn.pack(side="left", padx=5)
+        
+        # Buttons frame
+        buttons_frame = ctk.CTkFrame(self.theme_container, fg_color="transparent")
+        buttons_frame.pack(fill="x", padx=15, pady=(10, 15))
+        
+        # Create/Edit custom theme button
+        create_theme_btn = ctk.CTkButton(
+            buttons_frame,
+            text="✏️ Create Custom Theme",
+            command=self.open_theme_editor,
+            font=("Arial", 12),
+            fg_color=self.CYBER_PURPLE,
+            text_color=self.CYBER_TEXT_ACCENT,
+            hover_color=self.CYBER_PINK,
+            height=30
+        )
+        create_theme_btn.pack(side="left", padx=(0, 5))
+        
+        # Edit current theme button (if it's custom or to create variant)
+        edit_theme_btn = ctk.CTkButton(
+            buttons_frame,
+            text="📝 Edit Current Theme",
+            command=self.edit_current_theme,
+            font=("Arial", 12),
+            fg_color=self.CYBER_BLUE,
+            text_color=self.CYBER_TEXT_SECONDARY,
+            hover_color=self.CYBER_PURPLE,
+            height=30
+        )
+        edit_theme_btn.pack(side="left")
     
     def on_theme_changed(self):
         """Called when theme selection changes"""
         self.theme_changed = True
         self.show_restart_notice()
+    
+    def delete_custom_theme(self, theme_key: str):
+        """Delete a custom theme"""
+        from theme_config import delete_custom_theme, load_current_theme
+        
+        # Don't allow deleting if it's the current theme
+        current = load_current_theme()
+        if theme_key == current:
+            # Can't delete active theme - just return
+            return
+        
+        # Delete the theme
+        delete_custom_theme(theme_key)
+        
+        # Rebuild just the theme section
+        if hasattr(self, 'theme_container'):
+            self.theme_container.destroy()
+        self.create_theme_section()
+    
+    def create_content_frame(self):
+        """Recreate content frame with all sections"""
+        # Create or recreate scrollable content area
+        if hasattr(self, 'content_frame'):
+            self.content_frame.destroy()
+        
+        self.content_frame = ctk.CTkScrollableFrame(
+            self.main_frame,
+            fg_color=self.CYBER_GRAY,
+            height=250
+        )
+        self.content_frame.pack(fill="both", expand=True, pady=(0, 15))
+        
+        # Recreate all sections
+        self.create_volume_section()
+        self.create_theme_section()
+        self.create_warnings_section()
+        self.create_shortcuts_section()
+    
+    def open_theme_editor(self):
+        """Open theme editor to create new custom theme"""
+        ThemeEditorDialog(self, base_theme=None, callback=self.on_theme_saved)
+    
+    def edit_current_theme(self):
+        """Edit current theme (creates a variant if preset)"""
+        from theme_config import load_current_theme
+        current = load_current_theme()
+        ThemeEditorDialog(self, base_theme=current, callback=self.on_theme_saved)
+    
+    def on_theme_saved(self):
+        """Called when a theme is saved from editor"""
+        # Destroy and rebuild just the theme section
+        if hasattr(self, 'theme_container'):
+            self.theme_container.destroy()
+        self.create_theme_section()
+    
+    def change_canvas_color(self):
+        """Open color picker for canvas background"""
+        import tkinter.colorchooser as colorchooser
+        
+        current_color = self.canvas_hex_label.cget("text")
+        
+        color = colorchooser.askcolor(
+            color=current_color,
+            title="Choose Canvas Background Color",
+            parent=self
+        )
+        
+        if color and color[1]:
+            self.set_canvas_color(color[1])
+    
+    def set_canvas_color(self, hex_color: str):
+        """Set canvas background color and save to current theme"""
+        from theme_config import load_current_theme, save_canvas_override
+        
+        # Update UI
+        self.canvas_color_btn.configure(fg_color=hex_color, hover_color=hex_color)
+        self.canvas_hex_label.configure(text=hex_color)
+        
+        # Save as global override (applies to all themes)
+        save_canvas_override(hex_color)
+        
+        # Update main window canvas immediately if possible
+        if hasattr(self.master, 'image_canvas'):
+            self.master.image_canvas.configure(bg=hex_color)
+
+    
+    def create_warnings_section(self):
+        """Create custom warning points section"""
+        from theme_config import load_warnings
+        
+        warnings_container = ctk.CTkFrame(self.content_frame, fg_color=self.CYBER_LIGHT_GRAY, corner_radius=8)
+        warnings_container.pack(fill="x", padx=10, pady=10)
+        
+        # Header
+        warnings_header = ctk.CTkLabel(
+            warnings_container,
+            text="⚠️ Warning Points",
+            font=("Arial", 14, "bold"),
+        )
+        warnings_header.pack(pady=(15, 5), padx=15, anchor="w")
+        
+        # Description
+        desc_label = ctk.CTkLabel(
+            warnings_container,
+            text="Configure when warnings sound and timer color changes (based on % remaining)",
+            font=("Arial", 10),
+            text_color=self.CYBER_TEXT
+        )
+        desc_label.pack(pady=(0, 10), padx=15, anchor="w")
+        
+        # Load current warnings
+        self.warnings = load_warnings()
+        
+        # Warnings list frame
+        self.warnings_list_frame = ctk.CTkFrame(warnings_container, fg_color="transparent")
+        self.warnings_list_frame.pack(fill="x", padx=15, pady=(0, 10))
+        
+        self.build_warnings_list()
+        
+        # Add warning button
+        add_btn = ctk.CTkButton(
+            warnings_container,
+            text="+ Add Warning",
+            command=self.add_warning,
+            font=("Arial", 12),
+            fg_color=self.CYBER_PURPLE,
+            text_color=self.CYBER_TEXT_ACCENT,
+            hover_color=self.CYBER_PINK,
+            width=120,
+            height=30
+        )
+        add_btn.pack(pady=(0, 15))
+    
+    def build_warnings_list(self):
+        """Build the list of warning entries"""
+        # Clear existing
+        for widget in self.warnings_list_frame.winfo_children():
+            widget.destroy()
+        
+        # Sort warnings by percentage
+        sorted_warnings = sorted(self.warnings, key=lambda w: w['percentage'], reverse=True)
+        
+        for idx, warning in enumerate(sorted_warnings):
+            self.create_warning_entry(idx, warning)
+    
+    def create_warning_entry(self, idx: int, warning: dict):
+        """Create a single warning entry in the list"""
+        entry_frame = ctk.CTkFrame(self.warnings_list_frame, fg_color=self.CYBER_GRAY, corner_radius=4)
+        entry_frame.pack(fill="x", pady=2)
+        
+        # Warning label
+        warning_label = ctk.CTkLabel(
+            entry_frame,
+            text=f"Warning at {warning['percentage']}% remaining",
+            font=("Arial", 11, "bold"),
+            text_color=self.CYBER_TEXT
+        )
+        warning_label.pack(side="left", padx=10, pady=8)
+        
+        # Get actual color from theme
+        from theme_config import get_theme, load_current_theme
+        theme = get_theme(load_current_theme())
+        warning_color = warning.get('color_hex') or theme.get(warning.get('color', 'timer_warning_10'), '#ff6b35')
+        
+        # Color display button
+        color_btn = ctk.CTkButton(
+            entry_frame,
+            text="",
+            command=lambda: self.pick_color(idx),
+            fg_color=warning_color,
+            hover_color=warning_color,
+            width=30,
+            height=25,
+            corner_radius=4
+        )
+        color_btn.pack(side="right", padx=5)
+        
+        # Sound file label and button
+        sound_filename = warning.get('sound', 'bell.wav').split('/')[-1]
+        sound_btn = ctk.CTkButton(
+            entry_frame,
+            text=f"🔔 {sound_filename[:15]}",
+            command=lambda: self.pick_sound(idx),
+            font=("Arial", 10),
+            fg_color="transparent",
+            hover_color=self.CYBER_PURPLE,
+            text_color=self.CYBER_TEXT,
+            width=120,
+            height=25
+        )
+        sound_btn.pack(side="right", padx=5)
+        
+        # Delete button
+        delete_btn = ctk.CTkButton(
+            entry_frame,
+            text="✕",
+            command=lambda: self.delete_warning(idx),
+            font=("Arial", 14, "bold"),
+            fg_color="transparent",
+            hover_color="#ff4444",
+            text_color=self.CYBER_TEXT,
+            width=30,
+            height=25
+        )
+        delete_btn.pack(side="right", padx=5)
+    
+    def add_warning(self):
+        """Add a new warning point"""
+        # Simple dialog to get percentage
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Add Warning")
+        dialog.geometry("300x150")
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        # Center on parent
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 300) // 2
+        y = self.winfo_y() + (self.winfo_height() - 150) // 2
+        dialog.geometry(f"300x150+{x}+{y}")
+        
+        dialog.configure(fg_color=self.CYBER_DARK)
+        
+        # Label
+        label = ctk.CTkLabel(
+            dialog,
+            text="Warning at % remaining:",
+            font=("Arial", 12),
+            text_color=self.CYBER_TEXT
+        )
+        label.pack(pady=(20, 5))
+        
+        # Entry
+        entry = ctk.CTkEntry(
+            dialog,
+            font=("Arial", 12),
+            width=100
+        )
+        entry.pack(pady=5)
+        entry.insert(0, "25")
+        entry.focus()
+        
+        def save_warning():
+            try:
+                percentage = int(entry.get())
+                if 1 <= percentage <= 99:
+                    # Add warning with default color based on percentage
+                    if percentage >= 50:
+                        color_key = "timer_warning_50"
+                    else:
+                        color_key = "timer_warning_10"
+                    
+                    new_warning = {
+                        "percentage": percentage,
+                        "color": color_key,
+                        "sound": "assets/bell.wav"
+                    }
+                    self.warnings.append(new_warning)
+                    self.build_warnings_list()
+                    dialog.destroy()
+            except ValueError:
+                pass
+        
+        # Save button
+        save_btn = ctk.CTkButton(
+            dialog,
+            text="Add",
+            command=save_warning,
+            font=("Arial", 12),
+            fg_color=self.CYBER_GREEN,
+            hover_color=self.CYBER_TEAL,
+            text_color="#000000",
+            width=100
+        )
+        save_btn.pack(pady=10)
+        
+        entry.bind("<Return>", lambda e: save_warning())
+    
+    def delete_warning(self, idx: int):
+        """Delete a warning point"""
+        sorted_warnings = sorted(self.warnings, key=lambda w: w['percentage'], reverse=True)
+        warning_to_remove = sorted_warnings[idx]
+        self.warnings.remove(warning_to_remove)
+        self.build_warnings_list()
+    
+    def pick_color(self, idx: int):
+        """Open color picker for a warning"""
+        import tkinter.colorchooser as colorchooser
+        
+        sorted_warnings = sorted(self.warnings, key=lambda w: w['percentage'], reverse=True)
+        warning = sorted_warnings[idx]
+        
+        # Get current color
+        from theme_config import get_theme, load_current_theme
+        theme = get_theme(load_current_theme())
+        current_color = warning.get('color_hex') or theme.get(warning.get('color', 'timer_warning_10'), '#ff6b35')
+        
+        # Open color picker
+        color = colorchooser.askcolor(
+            color=current_color,
+            title=f"Choose color for {warning['percentage']}% warning",
+            parent=self
+        )
+        
+        if color and color[1]:  # color[1] is the hex string
+            # Find the warning in the original list and update it
+            for w in self.warnings:
+                if w['percentage'] == warning['percentage']:
+                    w['color_hex'] = color[1]
+                    break
+            self.build_warnings_list()
+    
+    def pick_sound(self, idx: int):
+        """Open file picker for warning sound"""
+        from tkinter import filedialog
+        
+        sorted_warnings = sorted(self.warnings, key=lambda w: w['percentage'], reverse=True)
+        warning = sorted_warnings[idx]
+        
+        # Open file picker
+        filename = filedialog.askopenfilename(
+            title=f"Select sound for {warning['percentage']}% warning",
+            filetypes=[("WAV files", "*.wav"), ("All files", "*.*")],
+            parent=self
+        )
+        
+        if filename:
+            # Find the warning in the original list and update it
+            for w in self.warnings:
+                if w['percentage'] == warning['percentage']:
+                    w['sound'] = filename
+                    break
+            self.build_warnings_list()
+
+
     
     def create_shortcuts_section(self):
         """Create collapsible keyboard shortcuts section"""
@@ -530,8 +956,8 @@ class SettingsDialog(ctk.CTkToplevel):
             command=lambda: self.edit_key(action, "primary"),
             font=("Arial", 11, "bold"),
             fg_color=self.CYBER_BLUE,
+            text_color=self.CYBER_TEXT_SECONDARY,
             hover_color=self.CYBER_PURPLE,
-            text_color="#000000",
             width=80,
             height=30
         )
@@ -581,7 +1007,7 @@ class SettingsDialog(ctk.CTkToplevel):
         # Save volume settings
         from pathlib import Path
         import json
-        from theme_config import save_theme
+        from theme_config import save_theme, save_warnings
         
         volumes = {
             "warning": self.warning_slider.get(),
@@ -603,7 +1029,243 @@ class SettingsDialog(ctk.CTkToplevel):
         if hasattr(self, 'selected_theme'):
             save_theme(self.selected_theme.get())
         
+        # Save warning points
+        if hasattr(self, 'warnings'):
+            save_warnings(self.warnings)
+        
         self.grab_release()
+        self.destroy()
+
+class ThemeEditorDialog(ctk.CTkToplevel):
+    """Dialog for creating/editing custom themes"""
+    
+    def __init__(self, parent, base_theme=None, callback=None):
+        super().__init__(parent)
+        
+        self.callback = callback
+        self.base_theme = base_theme
+        
+        # Load theme to edit
+        from theme_config import get_theme, THEMES
+        if base_theme:
+            self.theme_data = get_theme(base_theme).copy()
+            self.title(f"Edit Theme - {self.theme_data.get('name', base_theme)}")
+            # If editing a preset, suggest a variant name
+            if base_theme in THEMES:
+                self.theme_data['name'] = f"{self.theme_data['name']} (Custom)"
+        else:
+            # Start from Studio theme as default
+            self.theme_data = get_theme("studio").copy()
+            self.theme_data['name'] = "My Custom Theme"
+            self.title("Create Custom Theme")
+        
+        self.geometry("500x700")
+        self.resizable(False, True)
+        
+        # Make modal
+        self.transient(parent)
+        self.grab_set()
+        
+        # Center on parent
+        self.update_idletasks()
+        x = parent.winfo_x() + (parent.winfo_width() - 500) // 2
+        y = parent.winfo_y() + (parent.winfo_height() - 700) // 2
+        self.geometry(f"500x700+{x}+{y}")
+        
+        # Colors for UI (use parent's colors)
+        self.CYBER_DARK = parent.CYBER_DARK
+        self.CYBER_GRAY = parent.CYBER_GRAY
+        self.CYBER_LIGHT_GRAY = parent.CYBER_LIGHT_GRAY
+        self.CYBER_TEXT = parent.CYBER_TEXT
+        self.CYBER_BLUE = parent.CYBER_BLUE
+        self.CYBER_PURPLE = parent.CYBER_PURPLE
+        self.CYBER_PINK = parent.CYBER_PINK
+        self.CYBER_GREEN = parent.CYBER_GREEN
+        
+        self.configure(fg_color=self.CYBER_DARK)
+        
+        self.create_widgets()
+    
+    def create_widgets(self):
+        """Create theme editor UI"""
+        main_frame = ctk.CTkFrame(self, fg_color=self.CYBER_DARK)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Header
+        header = ctk.CTkLabel(
+            main_frame,
+            text="🎨 Theme Editor",
+            font=("Arial", 18, "bold"),
+            text_color=self.CYBER_BLUE
+        )
+        header.pack(pady=(0, 15))
+        
+        # Theme name
+        name_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        name_frame.pack(fill="x", pady=(0, 15))
+        
+        name_label = ctk.CTkLabel(
+            name_frame,
+            text="Theme Name:",
+            font=("Arial", 12),
+            text_color=self.CYBER_TEXT
+        )
+        name_label.pack(side="left", padx=(0, 10))
+        
+        self.name_entry = ctk.CTkEntry(
+            name_frame,
+            font=("Arial", 12),
+            width=250
+        )
+        self.name_entry.insert(0, self.theme_data.get('name', 'My Custom Theme'))
+        self.name_entry.pack(side="left")
+        
+        # Scrollable color pickers
+        scroll_frame = ctk.CTkScrollableFrame(
+            main_frame,
+            fg_color=self.CYBER_GRAY,
+            height=450
+        )
+        scroll_frame.pack(fill="both", expand=True, pady=(0, 15))
+        
+        # Store color entries
+        self.color_entries = {}
+        
+        # Color categories
+        categories = [
+            ("Backgrounds", ["dark", "gray", "light_gray"]),  # Removed canvas_bg - use Settings instead
+            ("Accent Colors", ["primary", "secondary", "accent", "success"]),
+            ("UI Colors", ["text", "warning"]),
+            ("Timer Colors", ["timer", "timer_normal", "timer_warning_50", "timer_warning_10"])
+        ]
+        
+        for category_name, color_keys in categories:
+            # Category header
+            cat_label = ctk.CTkLabel(
+                scroll_frame,
+                text=category_name,
+                font=("Arial", 13, "bold"),
+                text_color=self.CYBER_BLUE
+            )
+            cat_label.pack(anchor="w", pady=(10, 5), padx=10)
+            
+            for key in color_keys:
+                if key in self.theme_data:
+                    self.create_color_picker(scroll_frame, key, self.theme_data[key])
+        
+        # Buttons
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(fill="x")
+        
+        cancel_btn = ctk.CTkButton(
+            button_frame,
+            text="Cancel",
+            command=self.destroy,
+            font=("Arial", 12),
+            fg_color=self.CYBER_GRAY,
+            hover_color=self.CYBER_LIGHT_GRAY,
+            width=100
+        )
+        cancel_btn.pack(side="left", padx=5)
+        
+        save_btn = ctk.CTkButton(
+            button_frame,
+            text="Save Theme",
+            command=self.save_theme,
+            font=("Arial", 12, "bold"),
+            fg_color=self.CYBER_GREEN,
+            hover_color=self.CYBER_PURPLE,
+            text_color="#000000",
+            width=150
+        )
+        save_btn.pack(side="right", padx=5)
+    
+    def create_color_picker(self, parent, key: str, color: str):
+        """Create a color picker row"""
+        row_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        row_frame.pack(fill="x", padx=10, pady=3)
+        
+        # Label
+        label_text = key.replace("_", " ").title()
+        label = ctk.CTkLabel(
+            row_frame,
+            text=label_text + ":",
+            font=("Arial", 11),
+            text_color=self.CYBER_TEXT,
+            width=150,
+            anchor="w"
+        )
+        label.pack(side="left")
+        
+        # Color display button
+        color_btn = ctk.CTkButton(
+            row_frame,
+            text="",
+            command=lambda: self.pick_color(key),
+            fg_color=color,
+            hover_color=color,
+            width=40,
+            height=25
+        )
+        color_btn.pack(side="left", padx=5)
+        
+        # Color hex entry
+        entry = ctk.CTkEntry(
+            row_frame,
+            font=("Arial", 11),
+            width=100
+        )
+        entry.insert(0, color)
+        entry.pack(side="left", padx=5)
+        
+        self.color_entries[key] = (entry, color_btn)
+    
+    def pick_color(self, key: str):
+        """Open color picker for a theme color"""
+        import tkinter.colorchooser as colorchooser
+        
+        entry, color_btn = self.color_entries[key]
+        current_color = entry.get()
+        
+        color = colorchooser.askcolor(
+            color=current_color,
+            title=f"Choose {key.replace('_', ' ').title()}",
+            parent=self
+        )
+        
+        if color and color[1]:
+            entry.delete(0, 'end')
+            entry.insert(0, color[1])
+            color_btn.configure(fg_color=color[1], hover_color=color[1])
+    
+    def save_theme(self):
+        """Save the custom theme"""
+        from theme_config import save_custom_theme
+        import re
+        
+        # Get theme name
+        theme_name = self.name_entry.get().strip()
+        if not theme_name:
+            return
+        
+        # Create theme ID (lowercase, no spaces)
+        theme_id = re.sub(r'[^a-z0-9]+', '_', theme_name.lower())
+        
+        # Gather all colors
+        new_theme = {
+            "name": theme_name
+        }
+        
+        for key, (entry, _) in self.color_entries.items():
+            new_theme[key] = entry.get()
+        
+        # Save
+        save_custom_theme(theme_id, new_theme)
+        
+        # Callback to refresh parent
+        if self.callback:
+            self.callback()
+        
         self.destroy()
 
 
@@ -675,7 +1337,6 @@ class KeyEditDialog(ctk.CTkToplevel):
             main_frame,
             text=f"Set {self.key_type} key for:",
             font=("Arial", 12),
-            text_color=self.CYBER_TEXT
         )
         label.pack(pady=(0, 5))
         

@@ -28,7 +28,7 @@ from controllers.session_controller import SessionController, SessionState
 from controllers.keyboard_shortcuts import KeyboardShortcutsManager
 from gui.session_builder import SessionBuilderDialog
 from gui.settings_dialog import SettingsDialog
-from theme_config import get_theme, load_current_theme
+from theme_config import get_theme, load_current_theme, get_canvas_bg
 
 
 class MainWindow(ctk.CTk):
@@ -82,6 +82,13 @@ class MainWindow(ctk.CTk):
         # Load theme
         self.current_theme_name = load_current_theme()
         self.theme = get_theme(self.current_theme_name)
+        
+        # Calculate smart text colors for buttons
+        from theme_config import get_text_color_for_bg
+        self.text_for_primary = get_text_color_for_bg(self.theme["primary"])
+        self.text_for_secondary = get_text_color_for_bg(self.theme["secondary"])
+        self.text_for_accent = get_text_color_for_bg(self.theme["accent"])
+        self.text_for_success = get_text_color_for_bg(self.theme["success"])
         
         self.title("CroquisCadence")
         self.geometry("1400x800")
@@ -257,7 +264,7 @@ class MainWindow(ctk.CTk):
         # Use theme colors
         t = self.theme
         CYBER_PINK = t["primary"]
-        CYBER_DPINK = t["primary"]
+        CYBER_DPINK = t["primary"]  # Will be slightly darker
         CYBER_PURPLE = t["accent"]
         CYBER_VIOLET = t["accent"]
         CYBER_BLUE = t["secondary"]
@@ -272,10 +279,10 @@ class MainWindow(ctk.CTk):
         self.main_container = ctk.CTkFrame(self, fg_color=CYBER_DARK)
         self.main_container.pack(fill="both", expand=True, padx=0, pady=0)
         
-        # Top accent bar
+        # Top accent bar (matcha green theme accent)
         top_accent = ctk.CTkFrame(
             self.main_container,
-            fg_color=CYBER_PINK,
+            fg_color=CYBER_PINK,  # Primary theme color
             height=6,
             corner_radius=0
         )
@@ -315,7 +322,7 @@ class MainWindow(ctk.CTk):
         )
         self.block_info_label.pack(side="left", padx=(0, 10))
         
-        # Folder tag, right after block info
+        # Folder tag (shows which subfolder current image is from) - right after block info
         self.folder_tag_label = ctk.CTkLabel(
             left_info_frame,
             text="",
@@ -325,7 +332,7 @@ class MainWindow(ctk.CTk):
         )
         self.folder_tag_label.pack(side="left")
 
-        # Timer and history frame
+        # Timer and history frame (right side)
         timer_frame = ctk.CTkFrame(self.info_bar, fg_color=CYBER_GRAY)
         timer_frame.grid(row=0, column=2, padx=20, pady=10, sticky="e")
         
@@ -365,7 +372,7 @@ class MainWindow(ctk.CTk):
             width=100,
             fg_color=CYBER_GREEN,
             hover_color=CYBER_TEAL,
-            text_color="white",
+            text_color=self.text_for_success,
             font=("Arial", 13, "bold")
         )
         self.start_button.pack(side="left", padx=5)
@@ -378,7 +385,7 @@ class MainWindow(ctk.CTk):
             width=60,
             fg_color=CYBER_PURPLE,
             hover_color=CYBER_VIOLET,
-            text_color="white",
+            text_color=self.text_for_accent,
             font=("Arial", 20)
         )
         self.prev_block_button.pack(side="left", padx=5)
@@ -391,7 +398,7 @@ class MainWindow(ctk.CTk):
             width=60,
             fg_color=CYBER_BLUE,
             hover_color=CYBER_DBLUE,
-            text_color="black",
+            text_color=self.text_for_secondary,
             font=("Arial", 20, "bold")
         )
         self.prev_image_button.pack(side="left", padx=5)
@@ -404,7 +411,7 @@ class MainWindow(ctk.CTk):
             width=60,
             fg_color=CYBER_PINK,
             hover_color=CYBER_DPINK,
-            text_color="white",
+            text_color=self.text_for_primary,
             font=("Arial", 22, "bold")
         )
         self.pause_button.pack(side="left", padx=5)
@@ -417,7 +424,7 @@ class MainWindow(ctk.CTk):
             width=60,
             fg_color=CYBER_BLUE,
             hover_color=CYBER_DBLUE,
-            text_color="black",
+            text_color=self.text_for_secondary,
             font=("Arial", 20, "bold")
         )
         self.next_image_button.pack(side="left", padx=5)
@@ -430,7 +437,7 @@ class MainWindow(ctk.CTk):
             width=60,
             fg_color=CYBER_PURPLE,
             hover_color=CYBER_VIOLET,
-            text_color="white",
+            text_color=self.text_for_accent,
             font=("Arial", 20)
         )
         self.next_block_button.pack(side="left", padx=5)
@@ -443,7 +450,7 @@ class MainWindow(ctk.CTk):
             width=140,
             fg_color=CYBER_PINK,
             hover_color=CYBER_DPINK,
-            text_color="white",
+            text_color=self.text_for_primary,
             font=("Arial", 13, "bold")
         )
         self.stop_button.pack(side="left", padx=5)
@@ -486,7 +493,7 @@ class MainWindow(ctk.CTk):
         import tkinter as tk
         self.image_canvas = tk.Canvas(
             self.image_frame,
-            bg=self.theme["dark"],
+            bg=get_canvas_bg(self.theme),
             highlightthickness=0,
             bd=0
         )
@@ -521,7 +528,7 @@ class MainWindow(ctk.CTk):
         current_duration = block.duration
         remaining_same_duration = 0
         
-        # Count CONSECUTIVE blocks from current onwards
+        # Count CONSECUTIVE blocks from current onwards (stop at breaks or different duration/type)
         for i in range(block_index, total_blocks):
             check_block = self.session_controller.session.blocks[i]
             
@@ -562,7 +569,10 @@ class MainWindow(ctk.CTk):
         minutes = block.duration // 60
         seconds = block.duration % 60
         time_text = f"{minutes:02d}:{seconds:02d}"
-        self.timer_label.configure(text=time_text, text_color=self.theme.get("timer", self.theme["primary"]))
+        self.timer_label.configure(text=time_text, text_color=self.theme.get("timer_normal", self.theme.get("timer", self.theme["primary"])))
+        
+        # Reset warning tracking for new block
+        self._triggered_warnings = set()
 
         # Update progress bar
         self.update_progress()
@@ -597,19 +607,45 @@ class MainWindow(ctk.CTk):
         current_block = self.session_controller.session.blocks[self.session_controller.current_block_index]
         block_duration = current_block.duration
         
-        # Warning threshold: 10% of block duration, minimum 5s, rounded to multiple of 5
-        threshold = max(5, round((block_duration * 0.1) / 5) * 5)
+        # Load custom warnings
+        from theme_config import load_warnings
+        warnings = load_warnings()
         
-        # Change color to warning when below threshold
-        if remaining <= threshold:
-            self.timer_label.configure(text=time_text, text_color=self.theme["warning"])
+        # Sort warnings by percentage (highest first) so we check from most urgent to least
+        sorted_warnings = sorted(warnings, key=lambda w: w['percentage'])
+        
+        # Determine which warning level we're in
+        current_percentage = (remaining / block_duration) * 100
+        
+        # Find the appropriate warning
+        triggered_warning = None
+        for warning in sorted_warnings:
+            if current_percentage <= warning['percentage']:
+                triggered_warning = warning
+                break
+        
+        # Set timer color and play sound if we've entered a new warning zone
+        if triggered_warning:
+            # Get color - use custom color_hex if set, otherwise use theme color
+            if 'color_hex' in triggered_warning and triggered_warning['color_hex']:
+                warning_color = triggered_warning['color_hex']
+            else:
+                warning_color = self.theme.get(triggered_warning.get('color', 'timer_warning_10'), self.theme.get("timer", self.theme["primary"]))
             
-            # Play warning sound once when entering red zone
-            if not self.warning_sound_played:
-                self.play_warning_sound()
-                self.warning_sound_played = True
+            self.timer_label.configure(text=time_text, text_color=warning_color)
+            
+            # Play warning sound once per warning level
+            warning_key = f"warning_{triggered_warning['percentage']}"
+            if not hasattr(self, '_triggered_warnings'):
+                self._triggered_warnings = set()
+            
+            if warning_key not in self._triggered_warnings:
+                self._triggered_warnings.add(warning_key)
+                # Play the warning sound
+                self.play_warning_sound_file(triggered_warning.get('sound', 'assets/bell.wav'))
         else:
-            self.timer_label.configure(text=time_text, text_color=self.theme.get("timer", self.theme["primary"]))
+            # No warning - use normal timer color
+            self.timer_label.configure(text=time_text, text_color=self.theme.get("timer_normal", self.theme.get("timer", self.theme["primary"])))
         
         # Update progress bar
         self.update_progress()
@@ -732,9 +768,9 @@ class MainWindow(ctk.CTk):
     def open_settings(self):
         """Open settings dialog with keyboard shortcuts"""
         SettingsDialog(self, self.shortcuts_manager)
-
-    def play_warning_sound(self):
-        """Play warning chime with volume control"""
+    
+    def play_warning_sound_file(self, sound_file_path: str):
+        """Play a specific warning sound file with volume control"""
         def _play():
             try:
                 import json
@@ -743,18 +779,7 @@ class MainWindow(ctk.CTk):
                 import tempfile
                 import winsound
                 
-                # Load sound file path from settings
-                sound_file = Path("settings/sounds.json")
-                default_path = "assets/bell.wav"
-                
-                if sound_file.exists():
-                    with open(sound_file, 'r') as f:
-                        sounds = json.load(f)
-                        sound_path_str = sounds.get('warning', default_path)
-                else:
-                    sound_path_str = default_path
-                
-                sound_path = Path(resource_path(sound_path_str)) if sound_path_str.startswith("assets/") else Path(sound_path_str)
+                sound_path = Path(resource_path(sound_file_path)) if sound_file_path.startswith("assets/") else Path(sound_file_path)
                 
                 if not sound_path.exists():
                     return
@@ -768,33 +793,46 @@ class MainWindow(ctk.CTk):
                         volumes = json.load(f)
                         volume = volumes.get('warning', 0.7)
                 
-                # Read original WAV
-                with wave.open(str(sound_path), 'rb') as wf:
-                    params = wf.getparams()
-                    frames = wf.readframes(params.nframes)
+                # Scale volume (0.0 to 1.0)
+                if volume <= 0:
+                    return
+                
+                # Read WAV file
+                with wave.open(str(sound_path), 'rb') as wav_file:
+                    frames = wav_file.readframes(wav_file.getnframes())
+                    params = wav_file.getparams()
                 
                 # Adjust volume
-                samples = struct.unpack(f'{params.nframes * params.nchannels}h', frames)
-                adjusted_samples = [int(sample * volume) for sample in samples]
-                adjusted_frames = struct.pack(f'{len(adjusted_samples)}h', *adjusted_samples)
+                samples = struct.unpack(f'{len(frames)//2}h', frames)
+                scaled_samples = [int(sample * volume) for sample in samples]
+                scaled_frames = struct.pack(f'{len(scaled_samples)}h', *scaled_samples)
                 
-                # Write to temporary file
+                # Write to temp file
                 with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
                     temp_path = temp_wav.name
-                    with wave.open(temp_path, 'wb') as wf:
-                        wf.setparams(params)
-                        wf.writeframes(adjusted_frames)
+                    with wave.open(temp_path, 'wb') as temp_wav_file:
+                        temp_wav_file.setparams(params)
+                        temp_wav_file.writeframes(scaled_frames)
                 
-                # Play with winsound
+                # Play sound
                 winsound.PlaySound(temp_path, winsound.SND_FILENAME)
                 
-                # Cleanup
-                Path(temp_path).unlink()
-                
-            except:
-                pass  # Silently fail if sound doesn't work
+                # Clean up
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+                    
+            except Exception as e:
+                print(f"Error playing warning sound: {e}")
         
+        # Play in background thread
+        import threading
         threading.Thread(target=_play, daemon=True).start()
+
+    def play_warning_sound(self):
+        """Play default warning chime with volume control (kept for backward compatibility)"""
+        self.play_warning_sound_file("assets/bell.wav")
     
     def play_transition_sound(self):
         """Play transition sound with volume control"""
@@ -808,7 +846,7 @@ class MainWindow(ctk.CTk):
                 
                 # Load sound file path from settings
                 sound_file = Path("settings/sounds.json")
-                default_path = "assets/page_turn_stiff.wav"
+                default_path = "assets/Universfield_messageincoming2.wav"
                 
                 if sound_file.exists():
                     with open(sound_file, 'r') as f:
@@ -824,12 +862,12 @@ class MainWindow(ctk.CTk):
                 
                 # Load volume setting
                 volume_file = Path("settings/volume.json")
-                volume = 1.0  # Default
+                volume = 1.0  # Default (100%)
                 
                 if volume_file.exists():
                     with open(volume_file, 'r') as f:
                         volumes = json.load(f)
-                        volume = volumes.get('transition', 1.0)
+                        volume = volumes.get('transition', 0.5)
                 
                 # Read original WAV
                 with wave.open(str(sound_path), 'rb') as wf:
@@ -1069,10 +1107,10 @@ class ImageHistoryDialog(ctk.CTkToplevel):
         )
         scroll_frame.pack(fill="both", expand=True, pady=(0, 15))
         
-        # Display images in a grid
+        # Display images in a grid (3 columns)
         for idx, img_path in enumerate(images):
             try:
-                # Create frame for each image
+                # Create frame for each image (make it clickable)
                 img_frame = ctk.CTkFrame(scroll_frame, fg_color=CYBER_GRAY, corner_radius=8)
                 img_frame.grid(row=idx//3, column=idx%3, padx=10, pady=10, sticky="nsew")
                 
@@ -1158,7 +1196,7 @@ class ImageHistoryDialog(ctk.CTkToplevel):
         # Get the image path we want to revisit
         image_path = self.parent_window.session_controller.image_history[absolute_index]
         
-        # Add this image as a NEW entry at the end of history
+        # Add this image as a NEW entry at the end of history (keep all previous images)
         self.parent_window.session_controller.image_history.append(image_path)
         self.parent_window.session_controller.current_image_index = len(
             self.parent_window.session_controller.image_history

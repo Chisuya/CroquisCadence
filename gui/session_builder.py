@@ -69,6 +69,11 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         self.CYBER_GRAY = theme["gray"]
         self.CYBER_LIGHT_GRAY = theme["light_gray"]
         self.CYBER_TEXT = theme["text"]
+        # Calculate appropriate text colors based on button backgrounds
+        from theme_config import get_text_color_for_bg
+        self.CYBER_TEXT_PRIMARY = get_text_color_for_bg(self.CYBER_PINK)     # Text for primary buttons
+        self.CYBER_TEXT_SECONDARY = get_text_color_for_bg(self.CYBER_BLUE)   # Text for secondary buttons
+        self.CYBER_TEXT_ACCENT = get_text_color_for_bg(self.CYBER_PURPLE)    # Text for accent buttons
         
         self.configure(fg_color=self.CYBER_DARK)
         
@@ -223,6 +228,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             value="pose",
             font=("Arial", 12),
             fg_color=self.CYBER_BLUE,
+            text_color=self.CYBER_TEXT_SECONDARY,
             hover_color=self.CYBER_PURPLE,
             command=self.on_block_type_changed
         ).pack(side="left", padx=(0, 15))
@@ -234,6 +240,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             value="break",
             font=("Arial", 12),
             fg_color=self.CYBER_PINK,
+            text_color=self.CYBER_TEXT_PRIMARY,
             hover_color=self.CYBER_PURPLE,
             command=self.on_block_type_changed
         ).pack(side="left")
@@ -294,6 +301,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             font=("Arial", 11),
             width=100,
             fg_color=self.CYBER_PURPLE,
+            text_color=self.CYBER_TEXT_ACCENT,
             button_color=self.CYBER_PURPLE,
             button_hover_color=self.CYBER_BLUE
         )
@@ -403,8 +411,8 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             command=self.save_as_preset,
             font=("Arial", 12),
             fg_color=self.CYBER_BLUE,
+            text_color=self.CYBER_TEXT_SECONDARY,
             hover_color=self.CYBER_PURPLE,
-            text_color="#000000",
             width=140,
             height=40
         )
@@ -727,6 +735,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             width=30,
             height=30,
             fg_color=self.CYBER_PINK,
+            text_color=self.CYBER_TEXT_PRIMARY,
             hover_color=self.CYBER_PINK,
             font=("Arial", 16, "bold")
         )
@@ -741,6 +750,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
                 width=30,
                 height=30,
                 fg_color=self.CYBER_PURPLE,
+                text_color=self.CYBER_TEXT_ACCENT,
                 hover_color=self.CYBER_BLUE,
                 font=("Arial", 14)
             )
@@ -755,6 +765,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
                 width=30,
                 height=30,
                 fg_color=self.CYBER_PURPLE,
+                text_color=self.CYBER_TEXT_ACCENT,
                 hover_color=self.CYBER_BLUE,
                 font=("Arial", 14)
             )
@@ -1108,8 +1119,24 @@ class SavePresetDialog(ctk.CTkToplevel):
         self.CYBER_GRAY = theme["gray"]
         self.CYBER_LIGHT_GRAY = theme["light_gray"]
         self.CYBER_TEXT = theme["text"]
+        # Calculate appropriate text colors based on button backgrounds
+        from theme_config import get_text_color_for_bg
+        self.CYBER_TEXT_PRIMARY = get_text_color_for_bg(self.CYBER_PINK)     # Text for primary buttons
+        self.CYBER_TEXT_SECONDARY = get_text_color_for_bg(self.CYBER_BLUE)   # Text for secondary buttons
+        self.CYBER_TEXT_ACCENT = get_text_color_for_bg(self.CYBER_PURPLE)    # Text for accent buttons
         
         self.configure(fg_color=self.CYBER_DARK)
+
+
+
+
+
+
+
+
+
+
+
         
         self.create_widgets()
     
@@ -1123,7 +1150,6 @@ class SavePresetDialog(ctk.CTkToplevel):
             main_frame,
             text="Save as Preset",
             font=("Arial", 18, "bold"),
-            text_color=self.CYBER_BLUE
         )
         header.pack(pady=(0, 20))
         
@@ -1172,6 +1198,7 @@ class SavePresetDialog(ctk.CTkToplevel):
             value="with_folders",
             font=("Arial", 12),
             fg_color=self.CYBER_BLUE,
+            text_color=self.CYBER_TEXT_SECONDARY,
             hover_color=self.CYBER_PURPLE
         ).pack(anchor="w", padx=15, pady=10)
         
@@ -1193,6 +1220,7 @@ class SavePresetDialog(ctk.CTkToplevel):
             value="without_folders",
             font=("Arial", 12),
             fg_color=self.CYBER_PINK,
+            text_color=self.CYBER_TEXT_PRIMARY,
             hover_color=self.CYBER_PURPLE
         ).pack(anchor="w", padx=15, pady=10)
         
@@ -1331,18 +1359,13 @@ class EditFoldersDialog(ctk.CTkToplevel):
         self.CYBER_GRAY = theme["gray"]
         self.CYBER_LIGHT_GRAY = theme["light_gray"]
         self.CYBER_TEXT = theme["text"]
+        # Calculate text colors based on button backgrounds
+        from theme_config import get_text_color_for_bg
+        self.CYBER_TEXT_PRIMARY = get_text_color_for_bg(self.CYBER_PINK)     # Text for primary buttons
+        self.CYBER_TEXT_SECONDARY = get_text_color_for_bg(self.CYBER_BLUE)   # Text for secondary buttons
+        self.CYBER_TEXT_ACCENT = get_text_color_for_bg(self.CYBER_PURPLE)    # Text for accent buttons
         
         self.configure(fg_color=self.CYBER_DARK)
-
-
-
-
-
-
-
-
-
-
 
         self.configure(fg_color=self.CYBER_DARK)
         
@@ -1366,7 +1389,6 @@ class EditFoldersDialog(ctk.CTkToplevel):
             main_frame,
             text=f"Select Folders for Block {self.block_idx + 1}",
             font=("Arial", 16, "bold"),
-            text_color=self.CYBER_BLUE
         )
         header.pack(pady=(0, 10))
         
@@ -1504,7 +1526,7 @@ class EditFoldersDialog(ctk.CTkToplevel):
             if filter_text.lower() in f.lower()
         ]
         
-        # Sort alphabetically
+        # Sort alphabetically (case-insensitive)
         filtered_folders.sort(key=str.lower)
         
         if not filtered_folders:
@@ -1709,7 +1731,6 @@ class ManagePresetsDialog(ctk.CTkToplevel):
             main_frame,
             text="Manage Your Presets",
             font=("Arial", 18, "bold"),
-            text_color=self.CYBER_BLUE
         )
         header.pack(pady=(0, 20))
         
@@ -1809,6 +1830,7 @@ class ManagePresetsDialog(ctk.CTkToplevel):
             command=lambda: self.delete_preset(preset_name),
             font=("Arial", 11),
             fg_color=self.CYBER_PINK,
+            text_color=self.CYBER_TEXT_PRIMARY,
             hover_color=self.CYBER_PINK,
             width=90,
             height=35

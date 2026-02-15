@@ -979,21 +979,82 @@ class MainWindow(ctk.CTk):
         filename = filepath.stem
         extension = filepath.suffix
         
-        # Don't add if already tagged
+        # Don't add if already tagged (case-insensitive check)
         if '_nsfw' in filename.lower():
             return
         
-        # New filename with _nsfw
+        # New filename with _nsfw (lowercase to match our filter logic)
         new_filename = f"{filename}_nsfw{extension}"
         new_filepath = filepath.parent / new_filename
         
         try:
+            # Remove old path from cache before renaming
+            if filepath in self._image_cache:
+                del self._image_cache[filepath]
+            
+            # Get current block's filter
+            current_block = self.session_controller.session.blocks[
+                self.session_controller.current_block_index
+            ]
+            current_filter = current_block.nsfw_filter
+            print(f"[Tagging→NSFW] Current block filter: {current_filter}")
+            
+            # Update used_images_in_session set
+            if hasattr(self.session_controller, 'used_images_in_session'):
+                # Remove old path
+                if filepath in self.session_controller.used_images_in_session:
+                    self.session_controller.used_images_in_session.remove(filepath)
+                
+                # Only add new path if it still matches current filter
+                # If we're in SFW block and just tagged as NSFW, don't add it back!
+                if current_filter == "all" or current_filter == "nsfw":
+                    # Will add after rename
+                    print(f"[Tagging→NSFW] Will keep in rotation (filter={current_filter})")
+                    pass
+                else:
+                    # SFW block, NSFW image - don't add to used set
+                    print(f"[Tagging] Image now NSFW, removing from SFW rotation")
+            
             filepath.rename(new_filepath)
+            
+            # Update image collection cache
+            self.image_collection.refresh_file(filepath, new_filepath)
+            
+            # Add new path to used set only if filter matches
+            should_auto_advance = False
+            if hasattr(self.session_controller, 'used_images_in_session'):
+                if current_filter == "all" or current_filter == "nsfw":
+                    self.session_controller.used_images_in_session.add(new_filepath)
+                    print(f"[Tagging→NSFW] Added to used set, no auto-advance")
+                else:
+                    # Current image no longer valid for this filter - auto-advance
+                    # IMPORTANT: Still add to used set to prevent re-selection
+                    self.session_controller.used_images_in_session.add(new_filepath)
+                    should_auto_advance = True
+                    print(f"[Tagging→NSFW] Added to used set (to prevent re-selection), will auto-advance!")
+            
             # Update current path
             self.current_image_path = new_filepath
             print(f"Tagged as NSFW: {new_filename}")
+            
+            # Update ALL occurrences in image history (not just current)
+            if hasattr(self.session_controller, 'image_history'):
+                for i in range(len(self.session_controller.image_history)):
+                    if self.session_controller.image_history[i] == filepath:
+                        self.session_controller.image_history[i] = new_filepath
+            
+            # If image no longer matches filter, auto-advance to next valid image
+            if should_auto_advance:
+                print(f"[Tagging] Auto-advancing to next valid image")
+                self.next_image()  # Automatically go to next image
+            else:
+                # Refresh display immediately with new filename
+                self.display_image(new_filepath)
+            
         except Exception as e:
             print(f"Error tagging image: {e}")
+            import traceback
+            traceback.print_exc()
     
     def tag_image_sfw(self):
         """Rename file to remove _nsfw tag"""
@@ -1011,12 +1072,69 @@ class MainWindow(ctk.CTk):
         new_filepath = filepath.parent / new_filename
         
         try:
+            # Remove old path from cache before renaming
+            if filepath in self._image_cache:
+                del self._image_cache[filepath]
+            
+            # Get current block's filter
+            current_block = self.session_controller.session.blocks[
+                self.session_controller.current_block_index
+            ]
+            current_filter = current_block.nsfw_filter
+            
+            # Update used_images_in_session set
+            if hasattr(self.session_controller, 'used_images_in_session'):
+                # Remove old path
+                if filepath in self.session_controller.used_images_in_session:
+                    self.session_controller.used_images_in_session.remove(filepath)
+                
+                # Only add new path if it still matches current filter
+                # If we're in NSFW block and just tagged as SFW, don't add it back!
+                if current_filter == "all" or current_filter == "sfw":
+                    # Will add after rename
+                    pass
+                else:
+                    # NSFW block, SFW image - don't add to used set
+                    print(f"[Tagging] Image now SFW, removing from NSFW rotation")
+            
             filepath.rename(new_filepath)
+            
+            # Update image collection cache
+            self.image_collection.refresh_file(filepath, new_filepath)
+            
+            # Add new path to used set only if filter matches
+            should_auto_advance = False
+            if hasattr(self.session_controller, 'used_images_in_session'):
+                if current_filter == "all" or current_filter == "sfw":
+                    self.session_controller.used_images_in_session.add(new_filepath)
+                else:
+                    # Current image no longer valid for this filter - auto-advance
+                    # IMPORTANT: Still add to used set to prevent re-selection
+                    self.session_controller.used_images_in_session.add(new_filepath)
+                    should_auto_advance = True
+            
             # Update current path
             self.current_image_path = new_filepath
             print(f"Tagged as SFW: {new_filename}")
+            
+            # Update ALL occurrences in image history (not just current)
+            if hasattr(self.session_controller, 'image_history'):
+                for i in range(len(self.session_controller.image_history)):
+                    if self.session_controller.image_history[i] == filepath:
+                        self.session_controller.image_history[i] = new_filepath
+            
+            # If image no longer matches filter, auto-advance to next valid image
+            if should_auto_advance:
+                print(f"[Tagging] Auto-advancing to next valid image")
+                self.next_image()  # Automatically go to next image
+            else:
+                # Refresh display immediately with new filename
+                self.display_image(new_filepath)
+            
         except Exception as e:
             print(f"Error tagging image: {e}")
+            import traceback
+            traceback.print_exc()
     
     def toggle_fullscreen(self):
         """Toggle fullscreen mode"""
@@ -1199,7 +1317,7 @@ class ImageHistoryDialog(ctk.CTkToplevel):
         self.grab_set()
         
         # Load theme colors
-        from theme_config import get_theme, load_current_theme
+        from theme_config import get_theme, load_current_theme, get_text_color_for_bg
         theme = get_theme(load_current_theme())
         
         # Colors
@@ -1208,6 +1326,13 @@ class ImageHistoryDialog(ctk.CTkToplevel):
         CYBER_BLUE = theme["secondary"]
         CYBER_PINK = theme["primary"]
         CYBER_TEXT = theme["text"]
+        
+        # Smart text colors
+        TEXT_FOR_BLUE = get_text_color_for_bg(CYBER_BLUE)
+        TEXT_FOR_PINK = get_text_color_for_bg(CYBER_PINK)
+        
+        # Store theme for hover effects
+        self.theme = theme
         
         self.configure(fg_color=CYBER_DARK)
         
@@ -1304,55 +1429,46 @@ class ImageHistoryDialog(ctk.CTkToplevel):
             font=("Arial", 13, "bold"),
             fg_color=CYBER_BLUE,
             hover_color=CYBER_PINK,
+            text_color=TEXT_FOR_BLUE,  # Smart text color
             width=120,
             height=35
         )
         close_btn.pack()
     
     def jump_to_image(self, index: int):
-        """Add selected image as new entry in history (doesn't remove newer ones)"""
+        """Jump to selected image in history"""
         # Get the absolute index in image history
         block_start = self.parent_window.session_controller.block_start_indices.get(
             self.parent_window.session_controller.current_block_index, 0
         )
         absolute_index = block_start + index
         
-        # Get the image path we want to revisit
-        image_path = self.parent_window.session_controller.image_history[absolute_index]
-        
-        # Add this image as a NEW entry at the end of history (keep all previous images)
-        self.parent_window.session_controller.image_history.append(image_path)
-        self.parent_window.session_controller.current_image_index = len(
-            self.parent_window.session_controller.image_history
-        ) - 1
+        # Set the controller to this image
+        self.parent_window.session_controller.current_image_index = absolute_index
         
         # Update block's last index
         self.parent_window.session_controller.block_last_indices[
             self.parent_window.session_controller.current_block_index
-        ] = self.parent_window.session_controller.current_image_index
+        ] = absolute_index
         
-        # Get current block
+        # Get current block and image
         block = self.parent_window.session_controller.session.blocks[
             self.parent_window.session_controller.current_block_index
         ]
+        image_path = self.parent_window.session_controller.image_history[absolute_index]
         
-        # Reset timer and restart timer thread
+        # Increment version to reset timer with new thread
+        self.parent_window.session_controller._transitioning = True
+        self.parent_window.session_controller._transition_version += 1
+        current_version = self.parent_window.session_controller._transition_version
+        
+        # Reset timer
         self.parent_window.session_controller.remaining = block.duration
         self.parent_window.session_controller.block_start_time = __import__('time').time()
         
-        # Restart timer thread
-        self.parent_window.session_controller._current_thread_id += 1
-        thread_id = self.parent_window.session_controller._current_thread_id
+        self.parent_window.session_controller._transitioning = False
         
-        import threading
-        self.parent_window.session_controller._timer_thread = threading.Thread(
-            target=self.parent_window.session_controller._timer_loop,
-            args=(thread_id, block.duration),
-            daemon=True
-        )
-        self.parent_window.session_controller._timer_thread.start()
-        
-        # Update GUI
+        # Notify GUI to display the image
         if self.parent_window.session_controller.on_new_block:
             self.parent_window.session_controller.on_new_block(
                 self.parent_window.session_controller.current_block_index,
@@ -1360,10 +1476,21 @@ class ImageHistoryDialog(ctk.CTkToplevel):
                 image_path
             )
         
-        # Close the dialog
+        # Stop old timer and start new one with new version
+        if self.parent_window.session_controller._timer_thread:
+            self.parent_window.session_controller._stop_flag.set()
+            self.parent_window.session_controller._stop_flag.clear()
+        
+        import threading
+        self.parent_window.session_controller._timer_thread = threading.Thread(
+            target=self.parent_window.session_controller._timer_loop,
+            args=(current_version,),
+            daemon=True
+        )
+        self.parent_window.session_controller._timer_thread.start()
+        
+        # Close dialog
         self.destroy()
-
-
 if __name__ == "__main__":
     app = MainWindow()
     app.run()

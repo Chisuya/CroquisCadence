@@ -10,13 +10,9 @@ import random
 import os
 
 def is_nsfw_image(filepath: Path) -> bool:
-    """
-    Check if image is tagged as NSFW based on filename.
-    Returns True if filename contains '_nsfw' (case-insensitive).
-    """
+    """Check if image filename contains _nsfw tag (case-insensitive)"""
     filename = os.path.basename(str(filepath)).lower()
     return '_nsfw' in filename
-
 
 class ImageCollection:
     """Manages reference images with folder-based tagging"""
@@ -42,6 +38,12 @@ class ImageCollection:
                 # need this bc mac/linux usually suffix lowercase, windows is uppercase
                 if file_path.suffix.lower() in extensions:
                     self.images.append(file_path)
+
+    def refresh_file(self, old_path: Path, new_path: Path):
+        """Update internal cache when a file is renamed"""
+        if old_path in self.images:
+            index = self.images.index(old_path)
+            self.images[index] = new_path
 
     def get_available_folders(self) -> Set[str]:
         """
@@ -108,34 +110,37 @@ class ImageCollection:
             nsfw_filter: str = "all"
             ) -> Path:
         """
-        Get one random image from specified folders with NSFW filtering.
+        Get one random image from specified folder with NSFW filtering
         
-        :param folder_names: List of folder names to select from (None = all folders)
-        :param exclude: Image path to exclude from selection
-        :param nsfw_filter: Filter mode - "all" (default), "sfw", or "nsfw"
+        :param self: Description
+        :param folder_names: List of folder names to search
+        :type folder_names: List[str]
+        :param exclude: Image to exclude
+        :type exclude: Optional[Path]
+        :param nsfw_filter: Filter mode - "all", "sfw", or "nsfw"
+        :type nsfw_filter: str
         :return: Random image path
+        :rtype: Path
         """
         if folder_names:
             candidates = self.get_images_by_folders(folder_names)
         else:
             candidates = self.images.copy()
         
-        # Apply NSFW filter
+        # Apply NSFW filter (case-insensitive)
         if nsfw_filter == "sfw":
-            # Only SFW images (no _nsfw in filename)
             candidates = [img for img in candidates if not is_nsfw_image(img)]
         elif nsfw_filter == "nsfw":
-            # Only NSFW images (_nsfw in filename)
             candidates = [img for img in candidates if is_nsfw_image(img)]
-        # If "all", don't filter
+        # "all" = no filtering
         
         if exclude and exclude in candidates:
             candidates.remove(exclude)
 
         if len(candidates) == 0:
             if folder_names:
-                raise ValueError(f"Error, no images found in folders: {folder_names} with filter: {nsfw_filter}")
+                raise ValueError(f"Error, no images found in folders: {folder_names}")
             else:
-                raise ValueError(f"No images found in collection with filter: {nsfw_filter}")
+                raise ValueError("No images found in collection")
         
         return random.choice(candidates)

@@ -44,6 +44,8 @@ class SessionController:
         self._timer_thread: Optional[threading.Thread] = None
         self._stop_flag = threading.Event()
         self._pause_flag = threading.Event()
+        self._transitioning = False  # Simple flag - no lock needed
+        self._transition_version = 0  # Track which transition we're on
         
         # Block tracking
         self.block_start_indices: dict[int, int] = {}
@@ -74,75 +76,120 @@ class SessionController:
     
     def _start_block(self, block_index: int):
         """Start a specific block"""
-        if block_index >= len(self.session.blocks):
-            self.state = SessionState.COMPLETED
-            if self.on_session_end:
-                self.on_session_end()
-            return
+        print(f"[_start_block] Called for block {block_index}")
         
-        # Capture auto-advance flag before resetting
-        is_auto = self.is_auto_advance
-        self.is_auto_advance = False
+        # Set transitioning flag to skip timer ticks during setup
+        self._transitioning = True
+        self._transition_version += 1
+        current_version = self._transition_version
+        print(f"[_start_block] Transitioning=True, version now {current_version}")
         
-        self.current_block_index = block_index
-        self.block_start_indices[block_index] = len(self.image_history)
-        
-        block = self.session.blocks[block_index]
-        
-        # Set current_image_index to the end of history BEFORE getting image
-        self.current_image_index = len(self.image_history)
-        
-        image_path = self._get_current_image()
+        try:
+            if block_index >= len(self.session.blocks):
+                self.state = SessionState.COMPLETED
+                if self.on_session_end:
+                    self.on_session_end()
+                return
+            
+            # Capture auto-advance flag before resetting
+            is_auto = self.is_auto_advance
+            self.is_auto_advance = False
+            
+            self.current_block_index = block_index
+            self.block_start_indices[block_index] = len(self.image_history)
+            
+            block = self.session.blocks[block_index]
+            
+            # Set current_image_index to the end of history BEFORE getting image
+            self.current_image_index = len(self.image_history)
+            
+            image_path = self._get_current_image()
 
-        self.block_last_indices[block_index] = self.current_image_index
-        
-        # Notify GUI - pass is_auto flag if callback supports it
-        if self.on_new_block:
-            # Try passing is_auto parameter, fallback to old signature
-            try:
-                self.on_new_block(self.current_block_index, block, image_path, is_auto)
-            except TypeError:
-                # Callback doesn't accept is_auto parameter
-                self.on_new_block(self.current_block_index, block, image_path)
-        
-        # Start timer for this block
-        self.remaining = block.duration
-        self.block_start_time = time.time()
-        
-        # Stop old timer thread if exists
-        if self._timer_thread and self._timer_thread.is_alive():
-            # check if called fm timer thread
-            if threading.current_thread() != self._timer_thread:
-                # if not in timer thread, join
-                self._stop_flag.set()
-                self._timer_thread.join(timeout=0.5)
-                self._stop_flag.clear()
-            # if in timer thread, let it die by itself
-        
-        # Start new timer thread
-        self._timer_thread = threading.Thread(
-            target=self._timer_loop,
-            daemon=True
-        )
-        self._timer_thread.start()
+            self.block_last_indices[block_index] = self.current_image_index
+            
+            # Reset timer BEFORE notifying GUI
+            self.remaining = block.duration
+            self.block_start_time = time.time()
+            
+            # Notify GUI - pass is_auto flag if callback supports it
+            if self.on_new_block:
+                # Try passing is_auto parameter, fallback to old signature
+                try:
+                    self.on_new_block(self.current_block_index, block, image_path, is_auto)
+                except TypeError:
+                    # Callback doesn't accept is_auto parameter
+                    self.on_new_block(self.current_block_index, block, image_path)
+            
+            # Stop old timer thread if exists
+            if self._timer_thread and self._timer_thread.is_alive():
+                # check if called from timer thread
+                if threading.current_thread() != self._timer_thread:
+                    # if not in timer thread, join
+                    # Dont wait - let version system handle cleanup
+                    self._stop_flag.set()
+                    self._stop_flag.clear()
+                # if in timer thread, let it die by itself
+            
+            # Start new timer thread
+            self._timer_thread = threading.Thread(
+                target=self._timer_loop,
+                args=(current_version,),  # Pass version to detect stale threads
+                daemon=True
+            )
+            self._timer_thread.start()
+            print(f"[_start_block] Started timer thread v{current_version}")
+        finally:
+            # Clear transitioning flag
+            self._transitioning = False
+            print(f"[_start_block] Transitioning=False, block {block_index} ready")
     
-    def _timer_loop(self):
+    def _timer_loop(self, version: int):
         """Simple timer that just counts down"""
-        while self.remaining > 0 and not self._stop_flag.is_set():
+        print(f"[Timer v{version}] Started")
+        
+        # Each thread has its own local countdown - don't touch shared self.remaining
+        local_remaining = self.remaining
+        
+        while local_remaining > 0 and not self._stop_flag.is_set():
             if self._pause_flag.is_set():
                 time.sleep(0.1)
                 continue
-    
-            if self.on_tick:
-                self.on_tick(self.remaining)
+            
+            # Only the CURRENT thread should update shared state and tick
+            if version == self._transition_version and not self._transitioning:
+                # Update shared remaining
+                self.remaining = local_remaining
+                
+                if self.on_tick:
+                    print(f"[Timer v{version}] Tick: {local_remaining}s (current_version={self._transition_version})")
+                    self.on_tick(local_remaining)
+            else:
+                skip_reasons = []
+                if self._transitioning:
+                    skip_reasons.append("transitioning")
+                if self._stop_flag.is_set():
+                    skip_reasons.append("stopped")
+                if version != self._transition_version:
+                    skip_reasons.append(f"stale(v{version}!=v{self._transition_version})")
+                print(f"[Timer v{version}] SKIP tick: {', '.join(skip_reasons)}")
+                
+                # If we're stale, exit immediately
+                if version != self._transition_version:
+                    print(f"[Timer v{version}] Exiting (stale)")
+                    return
             
             time.sleep(1)
-            self.remaining -= 1
+            local_remaining -= 1  # Only decrement OUR local counter
         
-        # Timer finished
-        if not self._stop_flag.is_set() and self.remaining <= 0:
+        print(f"[Timer v{version}] Finished. local_remaining={local_remaining}, stopped={self._stop_flag.is_set()}, version={version}, current={self._transition_version}")
+        
+        # Timer finished - only advance if we're still the current thread
+        if not self._stop_flag.is_set() and local_remaining <= 0 and version == self._transition_version:
+            print(f"[Timer v{version}] Auto-advancing to next block")
             self.is_auto_advance = True  # Mark as automatic advancement
             self._start_block(self.current_block_index + 1)
+        else:
+            print(f"[Timer v{version}] Not advancing (stopped or stale)")
     
     def _get_current_image(self):
         """Get image at current index, generating if needed"""
@@ -223,48 +270,100 @@ class SessionController:
         if self.state not in [SessionState.RUNNING, SessionState.PAUSED]:
             return
         
-        block = self.session.blocks[self.current_block_index]
-        if block.block_type != "pose":
-            return
+        print(f"[next_image] Called")
         
-        self.current_image_index += 1
+        # Increment version to kill old timer thread
+        self._transitioning = True
+        self._transition_version += 1
+        current_version = self._transition_version
+        print(f"[next_image] Version now {current_version}")
         
-        self.block_last_indices[self.current_block_index] = self.current_image_index
+        try:
+            block = self.session.blocks[self.current_block_index]
+            if block.block_type != "pose":
+                return
+            
+            self.current_image_index += 1
+            
+            self.block_last_indices[self.current_block_index] = self.current_image_index
+            
+            image_path = self._get_current_image()
+            
+            # Reset timer for this block
+            self.remaining = block.duration
+            self.block_start_time = time.time()
+            print(f"[next_image] Reset timer to {self.remaining}s")
+        finally:
+            self._transitioning = False
         
-        image_path = self._get_current_image()
-        
-        # Reset timer for this block
-        self.remaining = block.duration
-        self.block_start_time = time.time()
-        
-        # Notify GUI with full block info to reset timer display
+        # Notify GUI AFTER transitioning flag is cleared (don't block timer)
         if self.on_new_block:
             self.on_new_block(self.current_block_index, block, image_path)
+        
+        # Restart timer thread with new version
+        if self._timer_thread and self._timer_thread.is_alive():
+            self._stop_flag.set()
+            # Don't wait - let it die
+            self._stop_flag.clear()
+        
+        self._timer_thread = threading.Thread(
+            target=self._timer_loop,
+            args=(current_version,),
+            daemon=True
+        )
+        self._timer_thread.start()
+        print(f"[next_image] Started new timer v{current_version}")
     
     def previous_image(self):
         """Show previous image in global history and reset timer"""
         if self.state not in [SessionState.RUNNING, SessionState.PAUSED]:
             return
         
-        block = self.session.blocks[self.current_block_index]
-        if block.block_type != "pose":
-            return  # Can't change images on break
+        print(f"[previous_image] Called")
         
-        # Move backward in global image history
-        if self.current_image_index > 0:
-            self.current_image_index -= 1
+        # Increment version to kill old timer thread
+        self._transitioning = True
+        self._transition_version += 1
+        current_version = self._transition_version
+        print(f"[previous_image] Version now {current_version}")
+        
+        try:
+            block = self.session.blocks[self.current_block_index]
+            if block.block_type != "pose":
+                return  # Can't change images on break
             
-            self.block_last_indices[self.current_block_index] = self.current_image_index
+            # Move backward in global image history
+            if self.current_image_index > 0:
+                self.current_image_index -= 1
+                
+                self.block_last_indices[self.current_block_index] = self.current_image_index
 
-            image_path = self.image_history[self.current_image_index]
-            
-            # Reset timer for this block
-            self.remaining = block.duration
-            self.block_start_time = time.time()
-            
-            # Notify GUI with full block info to reset timer display
-            if self.on_new_block:
-                self.on_new_block(self.current_block_index, block, image_path)
+                image_path = self.image_history[self.current_image_index]
+                
+                # Reset timer for this block
+                self.remaining = block.duration
+                self.block_start_time = time.time()
+                print(f"[previous_image] Reset timer to {self.remaining}s")
+        finally:
+            self._transitioning = False
+        
+        # Notify GUI AFTER transitioning flag is cleared (don't block timer)
+        if self.on_new_block:
+            self.on_new_block(self.current_block_index, block, image_path)
+        
+        # Restart timer thread with new version
+        if self._timer_thread and self._timer_thread.is_alive():
+            self._stop_flag.set()
+            # Don't wait - let it die
+            self._stop_flag.clear()
+        
+        self._timer_thread = threading.Thread(
+            target=self._timer_loop,
+            args=(current_version,),
+            daemon=True
+        )
+        self._timer_thread.start()
+        print(f"[previous_image] Started new timer v{current_version}")
     
     def skip_to_next_block(self):
         """Move to next block"""
@@ -274,10 +373,14 @@ class SessionController:
         if self.current_block_index >= len(self.session.blocks) - 1:
             return
         
+        print(f"[skip_to_next_block] Skipping from block {self.current_block_index} to {self.current_block_index + 1}")
+        
+        # set stop flag - version system will handle old thread cleanup
         self._stop_flag.set()
-        if self._timer_thread:
-            self._timer_thread.join(timeout=0.5)
+        print(f"[skip_to_next_block] Set stop flag")
+        # Don't wait for thread - causes lag!
         self._stop_flag.clear()
+        print(f"[skip_to_next_block] Cleared stop flag")
         
         self.current_image_index = len(self.image_history)
         self._start_block(self.current_block_index + 1)
@@ -290,10 +393,9 @@ class SessionController:
         if self.current_block_index <= 0:
             return
         
-        # Stop current timer
+        # Just set stop flag - version system will handle old thread cleanup
         self._stop_flag.set()
-        if self._timer_thread:
-            self._timer_thread.join(timeout=0.5)
+        # Don't wait for thread - causes lag
         self._stop_flag.clear()
         
         # Move to previous block

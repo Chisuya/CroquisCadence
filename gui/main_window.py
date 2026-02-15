@@ -470,6 +470,22 @@ class MainWindow(ctk.CTk):
         )
         self.settings_button.pack(side="left", padx=5)
 
+        # Pin button (Always on Top)
+        self.is_pinned = False
+        self.pin_button = ctk.CTkButton(
+            self.button_frame,
+            text="📌",
+            command=self.toggle_always_on_top,
+            width=60,
+            fg_color=CYBER_GRAY,
+            hover_color=CYBER_ACCENT,
+            border_width=2,
+            border_color=CYBER_BLUE,
+            text_color=CYBER_TEXT,
+            font=("Arial", 18)
+        )
+        self.pin_button.pack(side="left", padx=5)
+
         # Fullscreen button
         self.fullscreen_button = ctk.CTkButton(
             self.button_frame,
@@ -896,6 +912,26 @@ class MainWindow(ctk.CTk):
                 pass  # Silently fail if sound doesn't work
         
         threading.Thread(target=_play, daemon=True).start()
+    
+    def toggle_always_on_top(self):
+        """Toggle window always on top"""
+        self.is_pinned = not self.is_pinned
+        self.attributes('-topmost', self.is_pinned)
+        
+        # Update button appearance to show pinned state
+        if self.is_pinned:
+            # Pinned - highlight the button
+            self.pin_button.configure(
+                fg_color=self.theme["primary"],
+                text_color=self.text_for_primary
+            )
+        else:
+            # Unpinned - normal appearance
+            CYBER_GRAY = self.theme["gray"]
+            self.pin_button.configure(
+                fg_color=CYBER_GRAY,
+                text_color=self.theme["text"]
+            )
     
     def toggle_fullscreen(self):
         """Toggle fullscreen mode"""

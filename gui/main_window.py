@@ -149,6 +149,26 @@ class MainWindow(ctk.CTk):
         self.current_displayed_image: Optional[Path] = None
         
     
+    def _update_nsfw_badge(self, image_path):
+        """Update the NSFW/SFW badge based on the current image filename"""
+        if image_path is None:
+            self.nsfw_badge_label.configure(text="", fg_color="transparent")
+            return
+
+        from models.image_collection import is_nsfw_image
+        if is_nsfw_image(image_path):
+            self.nsfw_badge_label.configure(
+                text="NSFW",
+                fg_color="#CC2222",
+                text_color="#FFFFFF"
+            )
+        else:
+            self.nsfw_badge_label.configure(
+                text="SFW",
+                fg_color="#22AA44",
+                text_color="#FFFFFF"
+            )
+
     def _disable_button(self, button):
         """Grey out a button to show it's inactive (keeps layout stable, no shifting)"""
         bg = self.theme["gray"]
@@ -309,16 +329,27 @@ class MainWindow(ctk.CTk):
         )
         self.block_info_label.pack(anchor="w")
 
-        # Folder tag - second line below block info, always visible, never overflows
+        # Folder tag row - second line, folder name + nsfw badge side by side
+        folder_tag_row = ctk.CTkFrame(left_info_frame, fg_color=CYBER_GRAY)
+        folder_tag_row.pack(anchor="w")
+
         self.folder_tag_label = ctk.CTkLabel(
-            left_info_frame,
+            folder_tag_row,
             text="",
             font=("Arial", 11),
             text_color=CYBER_PURPLE,
-            anchor="w",
-            width=340
+            anchor="w"
         )
-        self.folder_tag_label.pack(anchor="w")
+        self.folder_tag_label.pack(side="left")
+
+        self.nsfw_badge_label = ctk.CTkLabel(
+            folder_tag_row,
+            text="",
+            font=("Arial", 10, "bold"),
+            corner_radius=4,
+            width=0
+        )
+        self.nsfw_badge_label.pack(side="left", padx=(6, 0))
 
         # Timer and history frame - anchored to right edge, fixed size
         timer_frame = ctk.CTkFrame(self.info_bar, fg_color=CYBER_GRAY)
@@ -568,21 +599,28 @@ class MainWindow(ctk.CTk):
         if block.block_type == "pose" and image_path:
             self.display_image(image_path)
             
-            # Extract and display folder name
+            # Extract and display folder name + nsfw badge
             try:
-                # Get the parent folder name (e.g., "hands", "poses", etc.)
                 folder_name = image_path.parent.name
                 self.folder_tag_label.configure(text=f"📁 {folder_name}")
             except:
                 self.folder_tag_label.configure(text="")
+            self._update_nsfw_badge(image_path)
         else:
             self.display_break()
             self.folder_tag_label.configure(text="")
+            self._update_nsfw_badge(None)
     
     def handle_image_change(self, image_path):
         """Called when image changes within the same block (timer should NOT reset)"""
         if image_path:
             self.display_image(image_path)
+            try:
+                folder_name = image_path.parent.name
+                self.folder_tag_label.configure(text=f"📁 {folder_name}")
+            except:
+                pass
+            self._update_nsfw_badge(image_path)
         
     def handle_tick(self, remaining):
         """Called every second during countdown"""
@@ -672,6 +710,7 @@ class MainWindow(ctk.CTk):
         """Called when session completes"""
         self.block_info_label.configure(text="Session complete!")
         self.folder_tag_label.configure(text="")
+        self._update_nsfw_badge(None)
         self.pause_button.configure(text="⏸")
         
         # Hide history and stop buttons, show start button
@@ -716,6 +755,7 @@ class MainWindow(ctk.CTk):
         self.session_controller.stop()
         self.block_info_label.configure(text="Session stopped")
         self.folder_tag_label.configure(text="")
+        self._update_nsfw_badge(None)
         self.timer_label.configure(text="00:00")
         self.pause_button.configure(text="⏸")
         
@@ -1012,6 +1052,7 @@ class MainWindow(ctk.CTk):
             else:
                 # Refresh display immediately with new filename
                 self.display_image(new_filepath)
+                self._update_nsfw_badge(new_filepath)
             
         except Exception as e:
             print(f"Error tagging image: {e}")
@@ -1076,6 +1117,7 @@ class MainWindow(ctk.CTk):
             else:
                 # Refresh display immediately with new filename
                 self.display_image(new_filepath)
+                self._update_nsfw_badge(new_filepath)
             
         except Exception as e:
             print(f"Error tagging image: {e}")

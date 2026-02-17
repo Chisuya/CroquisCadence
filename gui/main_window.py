@@ -515,15 +515,16 @@ class MainWindow(ctk.CTk):
         current_duration = block.duration
         remaining_same_duration = 0
         
-        # Count CONSECUTIVE blocks from current onwards (stop at breaks or different duration/type)
+        # Count CONSECUTIVE blocks from current onwards (stop at breaks, different duration, folders, or filter)
         for i in range(block_index, total_blocks):
             check_block = self.session_controller.session.blocks[i]
             
-            # Only count if same type AND same duration
-            if check_block.block_type == block.block_type and check_block.duration == current_duration:
+            if (check_block.block_type == block.block_type
+                    and check_block.duration == current_duration
+                    and check_block.folder_paths == block.folder_paths
+                    and check_block.nsfw_filter == block.nsfw_filter):
                 remaining_same_duration += 1
             else:
-                # Hit a different block type or duration - stop counting
                 break
         
         # Format the block info text
@@ -543,7 +544,7 @@ class MainWindow(ctk.CTk):
             
             # Show remaining count
             if remaining_same_duration > 1:
-                block_text = f"{remaining_same_duration} more of this length, {duration_str} each"
+                block_text = f"{remaining_same_duration} more of this type, {duration_str} each"
             else:
                 block_text = f"Last {duration_str} pose"
         else:

@@ -1043,7 +1043,8 @@ class SessionBuilderDialog(ctk.CTkToplevel):
                     block_type=block_data['block_type'],
                     duration=block_data['duration'],
                     count=block_data['count'],
-                    folder_paths=folder_paths
+                    folder_paths=folder_paths,
+                    nsfw_filter=block_data.get('nsfw_filter', 'all')
                 )
             )
         
@@ -1313,7 +1314,8 @@ class SavePresetDialog(ctk.CTkToplevel):
                     'block_type': block.block_type,
                     'duration': block.duration,
                     'count': block.count,
-                    'folder_paths': block.folder_paths if save_with_folders else None
+                    'folder_paths': block.folder_paths if save_with_folders else None,
+                    'nsfw_filter': block.nsfw_filter
                 }
                 for block in self.blocks
             ]

@@ -3,9 +3,10 @@ from typing import Optional, Callable
 from pathlib import Path
 import threading
 import time
+import random
 
 from models.session import Session, SessionBlock
-from models.image_collection import ImageCollection
+from models.image_collection import ImageCollection, is_nsfw_image
 
 
 class SessionState(Enum):
@@ -193,28 +194,28 @@ class SessionController:
         block = self.session.blocks[self.current_block_index]
         
         if block.block_type == "pose":
-            # Try to get an image that hasn't been used yet
-            max_attempts = 100
-            new_image = None
+            # Build candidate list directly (mirrors get_random_image logic)
+            if block.folder_paths:
+                candidates = self.image_collection.get_images_by_folders(block.folder_paths)
+            else:
+                candidates = list(self.image_collection.images)
             
-            for attempt in range(max_attempts):
-                # Get a random image from the folders with NSFW filter
-                candidate = self.image_collection.get_random_image(
-                    folder_names=block.folder_paths,
-                    exclude=None,  # We'll handle exclusion ourselves
-                    nsfw_filter=block.nsfw_filter
-                )
-                
-                # If this image hasn't been used, use it
-                if candidate not in self.used_images_in_session:
-                    new_image = candidate
-                    break
-                
-                # If all images have been used, reset and use any image
-                if attempt == max_attempts - 1:
-                    self.used_images_in_session.clear()
-                    new_image = candidate
-                    break
+            # Apply NSFW filter
+            if block.nsfw_filter == "sfw":
+                candidates = [img for img in candidates if not is_nsfw_image(img)]
+            elif block.nsfw_filter == "nsfw":
+                candidates = [img for img in candidates if is_nsfw_image(img)]
+            
+            # Find unused candidates
+            unused = [img for img in candidates if img not in self.used_images_in_session]
+            
+            # If all used, reset and use full pool
+            if not unused:
+                self.used_images_in_session.clear()
+                unused = candidates
+            
+            # Pick randomly from unused
+            new_image = random.choice(unused) if unused else None
             
             # Mark this image as used
             if new_image:

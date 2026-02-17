@@ -1942,6 +1942,7 @@ class ManagePresetsDialog(ctk.CTkToplevel):
         
         if response and response.lower() == 'yes':
             del self.presets[preset_name]
+            self.on_update_callback(self.presets)  # Save immediately
             self.refresh_preset_list()
     
     def close_dialog(self):

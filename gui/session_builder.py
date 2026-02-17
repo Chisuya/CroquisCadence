@@ -476,7 +476,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
                 
                 # Get NSFW filter setting (from folder selection dialog if opened)
                 nsfw_filter = getattr(self, 'current_nsfw_filter', "all")
-                print(f"[SessionBuilder] Creating block with nsfw_filter: {nsfw_filter}")  # Debug
+                # print(f"[SessionBuilder] Creating block with nsfw_filter: {nsfw_filter}")  # Debug
             
             # Create block
             block = SessionBlock(
@@ -1749,7 +1749,7 @@ class EditFoldersDialog(ctk.CTkToplevel):
         # Save NSFW filter to parent
         selected_filter = self.nsfw_filter.get()
         self.parent_window.current_nsfw_filter = selected_filter
-        print(f"[EditFoldersDialog] Saving NSFW filter: {selected_filter}")  # Debug
+        # print(f"[EditFoldersDialog] Saving NSFW filter: {selected_filter}")  # Debug
         
         self.on_update_callback(self.block_idx, new_folder_paths)
         self.grab_release()

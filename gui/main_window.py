@@ -309,7 +309,7 @@ class MainWindow(ctk.CTk):
         )
         self.block_info_label.pack(anchor="w")
 
-        # Folder tag
+        # Folder tag - second line below block info, always visible, never overflows
         self.folder_tag_label = ctk.CTkLabel(
             left_info_frame,
             text="",
@@ -348,7 +348,7 @@ class MainWindow(ctk.CTk):
         self.history_button.pack(side="left")
         self._disable_button(self.history_button)  # Disabled by default, enabled during session
 
-        # Control buttons - use place() to anchor dead center, prevent left/right content changing
+        # Control buttons - use place() to anchor dead center, immune to left/right content changing
         self.button_frame = ctk.CTkFrame(self.info_bar, fg_color=CYBER_GRAY)
         self.button_frame.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -490,7 +490,7 @@ class MainWindow(ctk.CTk):
         # Bind right-click for image tagging
         self.image_canvas.bind("<Button-3>", self.show_image_context_menu)
         
-        # Store canvas image reference
+        # Store canvas image reference (must keep ref to prevent garbage collection)
         self.canvas_image_ref = None
         self.current_image_path = None  # Track current image for tagging
     
@@ -751,6 +751,7 @@ class MainWindow(ctk.CTk):
         current_idx = self.session_controller.current_image_index
         
         # Show everything from block start to the furthest image reached
+        # (not just current - user may have gone back, history should be preserved)
         furthest_idx = max(
             self.session_controller.block_last_indices.get(current_block_idx, current_idx),
             current_idx
@@ -987,7 +988,7 @@ class MainWindow(ctk.CTk):
             # Update image collection cache
             self.image_collection.refresh_file(filepath, new_filepath)
             
-            # Add new path to used set, flag auto-advance if no longer valid for filter
+            # Add new path to used set; flag auto-advance if no longer valid for filter
             should_auto_advance = False
             if hasattr(self.session_controller, 'used_images_in_session'):
                 self.session_controller.used_images_in_session.add(new_filepath)
@@ -996,7 +997,7 @@ class MainWindow(ctk.CTk):
             
             # Update current path
             self.current_image_path = new_filepath
-            print(f"Tagged as NSFW: {new_filename}")
+            # print(f"Tagged as NSFW: {new_filename}")
             
             # Update ALL occurrences in image history (not just current)
             if hasattr(self.session_controller, 'image_history'):
@@ -1051,7 +1052,7 @@ class MainWindow(ctk.CTk):
             # Update image collection cache
             self.image_collection.refresh_file(filepath, new_filepath)
             
-            # Add new path to used set, flag auto-advance if no longer valid for filter
+            # Add new path to used set; flag auto-advance if no longer valid for filter
             should_auto_advance = False
             if hasattr(self.session_controller, 'used_images_in_session'):
                 self.session_controller.used_images_in_session.add(new_filepath)
@@ -1060,7 +1061,7 @@ class MainWindow(ctk.CTk):
             
             # Update current path
             self.current_image_path = new_filepath
-            print(f"Tagged as SFW: {new_filename}")
+            # print(f"Tagged as SFW: {new_filename}")
             
             # Update ALL occurrences in image history (not just current)
             if hasattr(self.session_controller, 'image_history'):

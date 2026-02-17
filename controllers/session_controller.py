@@ -76,19 +76,20 @@ class SessionController:
     
     def _start_block(self, block_index: int):
         """Start a specific block"""
-        print(f"[_start_block] Called for block {block_index}")
         
         # Set transitioning flag to skip timer ticks during setup
         self._transitioning = True
         self._transition_version += 1
         current_version = self._transition_version
-        print(f"[_start_block] Transitioning=True, version now {current_version}")
         
         try:
             if block_index >= len(self.session.blocks):
                 self.state = SessionState.COMPLETED
                 if self.on_session_end:
                     self.on_session_end()
+                # Reset to IDLE so a new session can be started
+                self.state = SessionState.IDLE
+                self.session = None
                 return
             
             # Capture auto-advance flag before resetting
@@ -137,15 +138,12 @@ class SessionController:
                 daemon=True
             )
             self._timer_thread.start()
-            print(f"[_start_block] Started timer thread v{current_version}")
         finally:
             # Clear transitioning flag
             self._transitioning = False
-            print(f"[_start_block] Transitioning=False, block {block_index} ready")
     
     def _timer_loop(self, version: int):
         """Simple timer that just counts down"""
-        print(f"[Timer v{version}] Started")
         
         # Each thread has its own local countdown - don't touch shared self.remaining
         local_remaining = self.remaining
@@ -161,7 +159,6 @@ class SessionController:
                 self.remaining = local_remaining
                 
                 if self.on_tick:
-                    print(f"[Timer v{version}] Tick: {local_remaining}s (current_version={self._transition_version})")
                     self.on_tick(local_remaining)
             else:
                 skip_reasons = []
@@ -171,25 +168,21 @@ class SessionController:
                     skip_reasons.append("stopped")
                 if version != self._transition_version:
                     skip_reasons.append(f"stale(v{version}!=v{self._transition_version})")
-                print(f"[Timer v{version}] SKIP tick: {', '.join(skip_reasons)}")
                 
                 # If we're stale, exit immediately
                 if version != self._transition_version:
-                    print(f"[Timer v{version}] Exiting (stale)")
                     return
             
             time.sleep(1)
             local_remaining -= 1  # Only decrement OUR local counter
         
-        print(f"[Timer v{version}] Finished. local_remaining={local_remaining}, stopped={self._stop_flag.is_set()}, version={version}, current={self._transition_version}")
         
         # Timer finished - only advance if we're still the current thread
         if not self._stop_flag.is_set() and local_remaining <= 0 and version == self._transition_version:
-            print(f"[Timer v{version}] Auto-advancing to next block")
             self.is_auto_advance = True  # Mark as automatic advancement
             self._start_block(self.current_block_index + 1)
         else:
-            print(f"[Timer v{version}] Not advancing (stopped or stale)")
+            pass  # Timer finished normally or was stopped
     
     def _get_current_image(self):
         """Get image at current index, generating if needed"""
@@ -206,8 +199,6 @@ class SessionController:
             
             for attempt in range(max_attempts):
                 # Get a random image from the folders with NSFW filter
-                if attempt == 0:  # Only print once
-                    print(f"[SessionController] Getting image with nsfw_filter: {block.nsfw_filter}")  # Debug
                 candidate = self.image_collection.get_random_image(
                     folder_names=block.folder_paths,
                     exclude=None,  # We'll handle exclusion ourselves
@@ -270,13 +261,11 @@ class SessionController:
         if self.state not in [SessionState.RUNNING, SessionState.PAUSED]:
             return
         
-        print(f"[next_image] Called")
         
         # Increment version to kill old timer thread
         self._transitioning = True
         self._transition_version += 1
         current_version = self._transition_version
-        print(f"[next_image] Version now {current_version}")
         
         try:
             block = self.session.blocks[self.current_block_index]
@@ -292,7 +281,6 @@ class SessionController:
             # Reset timer for this block
             self.remaining = block.duration
             self.block_start_time = time.time()
-            print(f"[next_image] Reset timer to {self.remaining}s")
         finally:
             self._transitioning = False
         
@@ -312,20 +300,17 @@ class SessionController:
             daemon=True
         )
         self._timer_thread.start()
-        print(f"[next_image] Started new timer v{current_version}")
     
     def previous_image(self):
         """Show previous image in global history and reset timer"""
         if self.state not in [SessionState.RUNNING, SessionState.PAUSED]:
             return
         
-        print(f"[previous_image] Called")
         
         # Increment version to kill old timer thread
         self._transitioning = True
         self._transition_version += 1
         current_version = self._transition_version
-        print(f"[previous_image] Version now {current_version}")
         
         try:
             block = self.session.blocks[self.current_block_index]
@@ -343,7 +328,6 @@ class SessionController:
                 # Reset timer for this block
                 self.remaining = block.duration
                 self.block_start_time = time.time()
-                print(f"[previous_image] Reset timer to {self.remaining}s")
         finally:
             self._transitioning = False
         
@@ -363,7 +347,6 @@ class SessionController:
             daemon=True
         )
         self._timer_thread.start()
-        print(f"[previous_image] Started new timer v{current_version}")
     
     def skip_to_next_block(self):
         """Move to next block"""
@@ -373,14 +356,11 @@ class SessionController:
         if self.current_block_index >= len(self.session.blocks) - 1:
             return
         
-        print(f"[skip_to_next_block] Skipping from block {self.current_block_index} to {self.current_block_index + 1}")
         
         # set stop flag - version system will handle old thread cleanup
         self._stop_flag.set()
-        print(f"[skip_to_next_block] Set stop flag")
         # Don't wait for thread - causes lag!
         self._stop_flag.clear()
-        print(f"[skip_to_next_block] Cleared stop flag")
         
         self.current_image_index = len(self.image_history)
         self._start_block(self.current_block_index + 1)

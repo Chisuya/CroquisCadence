@@ -74,36 +74,12 @@ class Session:
     def format_duration(self) -> str:
         """Return human-readable duration ex: 1h 55m"""
         total_seconds = self.total_duration()
-
-        # hours = total_seconds // 3600
-        # remaining = total_seconds % 3600
-        # minutes = remaining // 60
-        # seconds = remaining % 60
-
-        # PYTHONIC APPROACH: using divmod to return (quotient, remainder)
         hours, remaining = divmod(total_seconds, 3600)
         minutes, seconds = divmod(remaining, 60)
-
-        # # String part
-        # parts = []
-        # if hours > 0:
-        #     parts.append(f"{hours}h")
-        # if minutes > 0:
-        #     parts.append(f"{minutes}m")
-        # if seconds > 0:
-        #     parts.append(f"{seconds}s")
-        
-        # # If duration is 0, return "0s"
-        # return " ".join(parts) if parts else "0s"
-        
-        # PYTHONIC APPROACH
-        # Build parts conditionally
         parts = [
             f"{hours}h" if hours else None,
             f"{minutes}m" if minutes else None,
             f"{seconds}s" if seconds else None
         ]
-
-        # Filter out None values and join
         result = " ".join(filter(None, parts))
         return result if result else "0s"

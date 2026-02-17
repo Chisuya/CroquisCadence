@@ -13,7 +13,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         
         # Dialog setup
         self.title("Create Custom Session")
-        self.geometry("1000x720")
+        self.geometry("1100x720")  # Increased width to 1100 for badges + folder info
         self.resizable(False, False)
         
         # Make it modal
@@ -23,7 +23,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         # Position mid-right
         self.update_idletasks()
         
-        dialog_width = 1000
+        dialog_width = 1100
         dialog_height = 720
 
         parent_x = parent.winfo_x()
@@ -65,7 +65,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         self.CYBER_PURPLE = theme["accent"]
         self.CYBER_BLUE = theme["secondary"]
         self.CYBER_GREEN = theme["success"]
-        self.CYBER_TEAL = theme["success"]
+        self.CYBER_GREEN = theme["success"]
         self.CYBER_DARK = theme["dark"]
         self.CYBER_GRAY = theme["gray"]
         self.CYBER_LIGHT_GRAY = theme["light_gray"]
@@ -229,9 +229,8 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             value="pose",
             font=("Arial", 12),
             fg_color=self.CYBER_BLUE,
-            text_color=self.CYBER_TEXT_SECONDARY,
+            text_color=self.CYBER_TEXT,
             hover_color=self.CYBER_PURPLE,
-            command=self.on_block_type_changed
         ).pack(side="left", padx=(0, 15))
         
         ctk.CTkRadioButton(
@@ -241,9 +240,8 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             value="break",
             font=("Arial", 12),
             fg_color=self.CYBER_PINK,
-            text_color=self.CYBER_TEXT_PRIMARY,
+            text_color=self.CYBER_TEXT,
             hover_color=self.CYBER_PURPLE,
-            command=self.on_block_type_changed
         ).pack(side="left")
         
         # Count & Duration
@@ -396,7 +394,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             command=self.add_block,
             font=("Arial", 13, "bold"),
             fg_color=self.CYBER_GREEN,
-            hover_color=self.CYBER_TEAL,
+            hover_color=self.CYBER_GREEN,
             text_color="#000000",
             height=40
         )
@@ -508,9 +506,6 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         except Exception as e:
             print(f"Error getting folders: {e}")
         return []
-
-    def on_block_type_changed(self):
-        pass
 
     def _create_selected_tag(self, folder_name: str, is_all: bool = False):
         """Create a selected tag pill with X button"""
@@ -714,21 +709,28 @@ class SessionBuilderDialog(ctk.CTkToplevel):
                     remaining = len(block.folder_paths) - max_display
                     folder_info = f" [{shown_folders}... +{remaining} more]"
             
+            # Get NSFW filter badge
+            filter_badge = ""
+            filter_color = self.CYBER_TEXT
+            nsfw_filter = getattr(block, 'nsfw_filter', 'all')
+            if nsfw_filter == "nsfw":
+                filter_badge = "NSFW"
+                filter_color = "#CC2222"
+            elif nsfw_filter == "sfw":
+                filter_badge = "SFW"
+                filter_color = "#22AA44"
+            elif nsfw_filter == "all":
+                filter_badge = "ALL"
+                filter_color = "#4488DD"
+            
             text = f"{idx + 1}. {block.count}× {duration_str}{folder_info}"
             color = self.CYBER_BLUE
         else:
+            filter_badge = ""
+            filter_color = self.CYBER_TEXT
             minutes = block.duration // 60
             text = f"{idx + 1}. Break {minutes}m"
             color = self.CYBER_PINK
-        
-        label = ctk.CTkLabel(
-            frame,
-            text=text,
-            font=("Arial", 12),
-            text_color=color,
-            anchor="w"
-        )
-        label.pack(side="left", padx=10, pady=6, fill="x", expand=True)
         
         # Control buttons
         btn_frame = ctk.CTkFrame(frame, fg_color=self.CYBER_GRAY)
@@ -752,14 +754,14 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         if idx < len(self.blocks) - 1:
             down_btn = ctk.CTkButton(
                 btn_frame,
-                text="↓",
+                text="⬇",
                 command=lambda: self.move_block_down(idx),
                 width=30,
                 height=30,
-                fg_color=self.CYBER_PURPLE,
-                text_color=self.CYBER_TEXT_ACCENT,
+                fg_color=self.CYBER_BLUE,
+                text_color=self.CYBER_TEXT_SECONDARY,
                 hover_color=self.CYBER_BLUE,
-                font=("Arial", 14)
+                font=("Arial", 12)
             )
             down_btn.pack(side="right", padx=2)
         
@@ -767,30 +769,56 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         if idx > 0:
             up_btn = ctk.CTkButton(
                 btn_frame,
-                text="↑",
+                text="⬆",
                 command=lambda: self.move_block_up(idx),
                 width=30,
                 height=30,
-                fg_color=self.CYBER_PURPLE,
-                text_color=self.CYBER_TEXT_ACCENT,
+                fg_color=self.CYBER_BLUE,
+                text_color=self.CYBER_TEXT_SECONDARY,
                 hover_color=self.CYBER_BLUE,
-                font=("Arial", 14)
+                font=("Arial", 12)
             )
             up_btn.pack(side="right", padx=2)
         
         # Edit folders button
         if block.block_type == "pose":
-            edit_folders_btn = ctk.CTkButton(
+            edit_btn = ctk.CTkButton(
                 btn_frame,
                 text="📁",
                 command=lambda: self.edit_block_folders(idx),
                 width=30,
                 height=30,
-                fg_color=self.CYBER_TEAL,
-                hover_color=self.CYBER_GREEN,
+                fg_color=self.CYBER_PURPLE,
+                text_color=self.CYBER_TEXT_ACCENT,
+                hover_color=self.CYBER_PURPLE,
                 font=("Arial", 12)
             )
-            edit_folders_btn.pack(side="right", padx=2)
+            edit_btn.pack(side="right", padx=2)
+        
+        # Create a container for badge + text
+        content_frame = ctk.CTkFrame(frame, fg_color=self.CYBER_GRAY)
+        content_frame.pack(side="left", fill="x", expand=True)
+        
+        # Badge label - ALWAYS show
+        badge_label = ctk.CTkLabel(
+            content_frame,
+            text=f"[{filter_badge}]" if filter_badge else "",
+            font=("Arial", 9, "bold"),
+            text_color=filter_color if filter_badge else self.CYBER_GRAY,
+            anchor="w",
+            width=45
+        )
+        badge_label.pack(side="left", padx=(10, 2), pady=6)
+        
+        # Text label
+        label = ctk.CTkLabel(
+            content_frame,
+            text=text,
+            font=("Arial", 12),
+            text_color=color,
+            anchor="w"
+        )
+        label.pack(side="left", padx=(2, 10), pady=6, fill="x", expand=True)  # Always same padding
     
     def move_block_up(self, idx: int):
         """Move block up in the list"""
@@ -848,7 +876,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
             self.blocks_frame,
             text=f"⚠️ {message}",
             font=("Arial", 12),
-            text_color="#FF4444"
+            text_color="#CC2222"
         )
         error_label.pack(pady=10)
         self.after(3000, error_label.destroy)
@@ -871,7 +899,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         
         expanded_blocks = []
         for block in self.blocks:
-            print(f"[SessionBuilder] Expanding block with nsfw_filter: {block.nsfw_filter}")  # Debug
+            # print(f"[SessionBuilder] Expanding block with nsfw_filter: {block.nsfw_filter}")  # Debug
             for _ in range(block.count):
                 expanded_blocks.append(
                     SessionBlock(
@@ -925,11 +953,9 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         """Load saved presets from file"""
         if not self.presets_file.exists():
             return {}
-        
         try:
             with open(self.presets_file, 'r') as f:
-                data = json.load(f)
-                return data
+                return json.load(f)
         except Exception as e:
             print(f"Error loading presets: {e}")
             return {}
@@ -979,7 +1005,7 @@ class SessionBuilderDialog(ctk.CTkToplevel):
                     command=lambda name=preset_name: self.load_custom_preset(name),
                     font=("Arial", 10),
                     fg_color=self.CYBER_GREEN,
-                    hover_color=self.CYBER_TEAL,
+                    hover_color=self.CYBER_GREEN,
                     text_color="#000000",
                     width=120,
                     height=28
@@ -1066,11 +1092,11 @@ class SessionBuilderDialog(ctk.CTkToplevel):
         """Called when block folders are updated from edit dialog"""
         if 0 <= block_idx < len(self.blocks):
             self.blocks[block_idx].folder_paths = new_folder_paths
-            # Also update nsfw_filter from current selection
+
             new_filter = getattr(self, 'current_nsfw_filter', 'all')
             self.blocks[block_idx].nsfw_filter = new_filter
-            print(f"[SessionBuilder] Updated block {block_idx} nsfw_filter to: {new_filter}")  # Debug
-            print(f"[SessionBuilder] Block now has: {self.blocks[block_idx].nsfw_filter}")  # Debug
+            # print(f"[SessionBuilder] Updated block {block_idx} nsfw_filter to: {new_filter}")  # Debug
+            # print(f"[SessionBuilder] Block now has: {self.blocks[block_idx].nsfw_filter}")  # Debug
             self.refresh_blocks_list()
 
 class SavePresetDialog(ctk.CTkToplevel):
@@ -1140,17 +1166,6 @@ class SavePresetDialog(ctk.CTkToplevel):
         self.CYBER_TEXT_ACCENT = get_text_color_for_bg(self.CYBER_PURPLE)    # Text for accent buttons
         
         self.configure(fg_color=self.CYBER_DARK)
-
-
-
-
-
-
-
-
-
-
-
         
         self.create_widgets()
     
@@ -1285,7 +1300,7 @@ class SavePresetDialog(ctk.CTkToplevel):
         
         if not preset_name:
             # Flash the entry to indicate error
-            self.name_entry.configure(border_color="#FF4444")
+            self.name_entry.configure(border_color="#CC2222")
             self.after(500, lambda: self.name_entry.configure(border_color=""))
             return
         
@@ -1333,7 +1348,7 @@ class EditFoldersDialog(ctk.CTkToplevel):
         self.update_idletasks()
         
         dialog_width = 500
-        dialog_height = 750  # Increased from 650
+        dialog_height = 750
         
         parent_x = parent.winfo_x()
         parent_y = parent.winfo_y()
@@ -1368,7 +1383,7 @@ class EditFoldersDialog(ctk.CTkToplevel):
         self.CYBER_PURPLE = theme["accent"]
         self.CYBER_BLUE = theme["secondary"]
         self.CYBER_GREEN = theme["success"]
-        self.CYBER_TEAL = theme["success"]
+        self.CYBER_GREEN = theme["success"]
         self.CYBER_DARK = theme["dark"]
         self.CYBER_GRAY = theme["gray"]
         self.CYBER_LIGHT_GRAY = theme["light_gray"]
@@ -1577,7 +1592,7 @@ class EditFoldersDialog(ctk.CTkToplevel):
             command=self.save,
             font=("Arial", 12, "bold"),
             fg_color=self.CYBER_GREEN,
-            hover_color=self.CYBER_TEAL,
+            hover_color=self.CYBER_GREEN,
             text_color="#000000",
             width=120,
             height=35
@@ -1784,13 +1799,24 @@ class ManagePresetsDialog(ctk.CTkToplevel):
         
         self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
         
-        self.CYBER_PINK = "#FF6EC7"
-        self.CYBER_BLUE = "#67E8F9"
-        self.CYBER_GREEN = "#67F971"
-        self.CYBER_DARK = "#0f0f0f"
-        self.CYBER_GRAY = "#1f1f1f"
-        self.CYBER_LIGHT_GRAY = "#2a2a2a"
-        self.CYBER_TEXT = "#E5E5E5"
+        # Load theme colors
+        from theme_config import get_theme, load_current_theme
+        theme = get_theme(load_current_theme())
+        
+        # Colors
+        self.CYBER_PINK = theme["primary"]
+        self.CYBER_BLUE = theme["secondary"]
+        self.CYBER_GREEN = theme["success"]
+        self.CYBER_PURPLE = theme["accent"]
+        self.CYBER_DARK = theme["dark"]
+        self.CYBER_GRAY = theme["gray"]
+        self.CYBER_LIGHT_GRAY = theme["light_gray"]
+        self.CYBER_TEXT = theme["text"]
+        # Calculate appropriate text colors based on button backgrounds
+        from theme_config import get_text_color_for_bg
+        self.CYBER_TEXT_PRIMARY = get_text_color_for_bg(self.CYBER_PINK)     # Text for primary buttons
+        self.CYBER_TEXT_SECONDARY = get_text_color_for_bg(self.CYBER_BLUE)   # Text for secondary buttons
+        self.CYBER_TEXT_ACCENT = get_text_color_for_bg(self.CYBER_PURPLE)    # Text for accent buttons
         
         self.configure(fg_color=self.CYBER_DARK)
         

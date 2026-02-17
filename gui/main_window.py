@@ -18,7 +18,6 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 import customtkinter as ctk
-from pathlib import Path
 from PIL import Image, ImageTk
 from typing import Optional
 
@@ -130,13 +129,9 @@ class MainWindow(ctk.CTk):
         self.current_image_path: Optional[Path] = None
         self.is_fullscreen = False
         
-        # Sound effect tracking
-        self.warning_sound_played = False 
-        
         # Image caching
         self._image_cache = {}
-        self._scaled_cache = {}  # Caches scaled CTkImage objects (key: (path, width, height))
-        
+
         # Resize debouncing
         self._resize_timer = None
         
@@ -154,6 +149,31 @@ class MainWindow(ctk.CTk):
         self.current_displayed_image: Optional[Path] = None
         
     
+    def _disable_button(self, button):
+        """Grey out a button to show it's inactive (keeps layout stable, no shifting)"""
+        bg = self.theme["gray"]
+        button.configure(
+            state="disabled",
+            fg_color=bg,
+            hover_color=bg,
+            text_color="#555555",
+            border_width=1,
+            border_color="#444444"
+        )
+
+    def _show_button(self, button, fg_color, hover_color, text_color, border_width=0, border_color=None):
+        """Make a previously hidden button visible again"""
+        config = dict(
+            state="normal",
+            fg_color=fg_color,
+            hover_color=hover_color,
+            text_color=text_color,
+            border_width=border_width
+        )
+        if border_color:
+            config["border_color"] = border_color
+        button.configure(**config)
+
     def setup_keyboard_shortcuts(self):
         """Register callbacks for keyboard shortcuts"""
         self.shortcuts_manager.register_callback("pause_resume", self.toggle_pause)
@@ -175,30 +195,6 @@ class MainWindow(ctk.CTk):
         if self.session_controller.state in [SessionState.RUNNING, SessionState.PAUSED]:
             self.shortcuts_manager.handle_key_press(key)
 
-    def _get_available_image_space(self):
-        """
-        Get available space from the image frame.
-        Returns dimensions that will DEFINITELY fit within the visible area.
-        """
-        # Force complete layout update
-        self.update_idletasks()
-        
-        # Get frame dimensions
-        frame_height = self.image_frame.winfo_height()
-        frame_width = self.image_frame.winfo_width()
-        
-        # If not yet laid out, force update
-        if frame_width <= 1 or frame_height <= 1:
-            self.update()
-            frame_width = self.image_frame.winfo_width()
-            frame_height = self.image_frame.winfo_height()
-        
-        # Just use frame dimensions directly with tiny margin
-        available_height = max(100, frame_height - 10)
-        available_width = max(100, frame_width - 10)
-        
-        return available_width, available_height
-
     def on_window_resize(self, event):
         """Handle window resize - rescale current image with debouncing"""
         # Cancel previous timer if it exists
@@ -212,7 +208,7 @@ class MainWindow(ctk.CTk):
         """Actually perform the resize after debounce delay"""
         self._resize_timer = None
         
-        # Only resize if we have an image displayed
+        # Only resize if have an image displayed
         if self.current_displayed_image and self.session_controller.state != SessionState.IDLE:
             # Check if break or pose
             current_block = self.session_controller.session.blocks[self.session_controller.current_block_index]
@@ -237,11 +233,9 @@ class MainWindow(ctk.CTk):
             self.session_controller.previous_image()
 
     def next_image(self):
-        # Fixes NoneType object has no attribute "blocks" error
+        """Show next image for current block, skip breaks"""
         if not self.session_controller.session:
             return
-        
-        """Show next image for current block, skip breaks"""
         # Check if current block is a break
         current_block = self.session_controller.session.blocks[self.session_controller.current_block_index]
         
@@ -261,20 +255,14 @@ class MainWindow(ctk.CTk):
             
     def create_widgets(self):
         """Create all GUI widgets"""
-        # Use theme colors
         t = self.theme
-        CYBER_PINK = t["primary"]
-        CYBER_DPINK = t["primary"]  # Will be slightly darker
+        CYBER_PINK   = t["primary"]
         CYBER_PURPLE = t["accent"]
-        CYBER_VIOLET = t["accent"]
-        CYBER_BLUE = t["secondary"]
-        CYBER_DBLUE = t["secondary"]
-        CYBER_GREEN = t["success"]
-        CYBER_TEAL = t["success"]
-        CYBER_ACCENT = t["accent"]
-        CYBER_DARK = t["dark"]
-        CYBER_GRAY = t["gray"]
-        CYBER_TEXT = t["text"]
+        CYBER_BLUE   = t["secondary"]
+        CYBER_GREEN  = t["success"]
+        CYBER_DARK   = t["dark"]
+        CYBER_GRAY   = t["gray"]
+        CYBER_TEXT   = t["text"]
         
         self.main_container = ctk.CTkFrame(self, fg_color=CYBER_DARK)
         self.main_container.pack(fill="both", expand=True, padx=0, pady=0)
@@ -303,39 +291,39 @@ class MainWindow(ctk.CTk):
         self.info_bar = ctk.CTkFrame(self.main_container, fg_color=CYBER_GRAY, height=100)
         self.info_bar.pack(fill="x", side="bottom", padx=20, pady=20)
         self.info_bar.pack_propagate(False)
-        
-        self.info_bar.grid_columnconfigure(0, weight=1)  # left
-        self.info_bar.grid_columnconfigure(1, weight=1)  # center
-        self.info_bar.grid_columnconfigure(2, weight=1)  # right
 
-        # Left info frame (holds block info + folder tag)
+        # Left info frame - anchored to left edge, fixed size, never pushes center
         left_info_frame = ctk.CTkFrame(self.info_bar, fg_color=CYBER_GRAY)
-        left_info_frame.grid(row=0, column=0, padx=20, pady=10, sticky="w")
-        
-        # Block info
+        left_info_frame.place(relx=0.0, rely=0.5, anchor="w", x=20)
+        left_info_frame.configure(width=350, height=60)
+        left_info_frame.pack_propagate(False)
+
+        # Block info - top line
         self.block_info_label = ctk.CTkLabel(
             left_info_frame,
             text="Ready to start",
             font=("Arial", 16),
             text_color=CYBER_BLUE,
-            anchor="w"
+            anchor="w",
+            width=340
         )
-        self.block_info_label.pack(side="left", padx=(0, 10))
-        
-        # Folder tag (shows which subfolder current image is from) - right after block info
+        self.block_info_label.pack(anchor="w")
+
+        # Folder tag
         self.folder_tag_label = ctk.CTkLabel(
             left_info_frame,
             text="",
-            font=("Arial", 12),
+            font=("Arial", 11),
             text_color=CYBER_PURPLE,
             anchor="w",
+            width=340
         )
-        self.folder_tag_label.pack(side="left")
+        self.folder_tag_label.pack(anchor="w")
 
-        # Timer and history frame (right side)
+        # Timer and history frame - anchored to right edge, fixed size
         timer_frame = ctk.CTkFrame(self.info_bar, fg_color=CYBER_GRAY)
-        timer_frame.grid(row=0, column=2, padx=20, pady=10, sticky="e")
-        
+        timer_frame.place(relx=1.0, rely=0.5, anchor="e", x=-20)
+
         # Timer
         self.timer_label = ctk.CTkLabel(
             timer_frame,
@@ -358,11 +346,11 @@ class MainWindow(ctk.CTk):
             corner_radius=8
         )
         self.history_button.pack(side="left")
-        self.history_button.pack_forget()  # Hidden by default, shown during session
+        self._disable_button(self.history_button)  # Disabled by default, enabled during session
 
-        # Control buttons
+        # Control buttons - use place() to anchor dead center, prevent left/right content changing
         self.button_frame = ctk.CTkFrame(self.info_bar, fg_color=CYBER_GRAY)
-        self.button_frame.grid(row=0, column=1, padx=5, pady=10)
+        self.button_frame.place(relx=0.5, rely=0.5, anchor="center")
 
         # Start button
         self.start_button = ctk.CTkButton(
@@ -371,7 +359,7 @@ class MainWindow(ctk.CTk):
             command=self.open_session_builder,
             width=100,
             fg_color=CYBER_GREEN,
-            hover_color=CYBER_TEAL,
+            hover_color=CYBER_GREEN,
             text_color=self.text_for_success,
             font=("Arial", 13, "bold")
         )
@@ -384,7 +372,7 @@ class MainWindow(ctk.CTk):
             command=self.previous_block,
             width=60,
             fg_color=CYBER_PURPLE,
-            hover_color=CYBER_VIOLET,
+            hover_color=CYBER_PURPLE,
             text_color=self.text_for_accent,
             font=("Arial", 20)
         )
@@ -397,7 +385,7 @@ class MainWindow(ctk.CTk):
             command=self.previous_image,
             width=60,
             fg_color=CYBER_BLUE,
-            hover_color=CYBER_DBLUE,
+            hover_color=CYBER_BLUE,
             text_color=self.text_for_secondary,
             font=("Arial", 20, "bold")
         )
@@ -410,7 +398,7 @@ class MainWindow(ctk.CTk):
             command=self.toggle_pause,
             width=60,
             fg_color=CYBER_PINK,
-            hover_color=CYBER_DPINK,
+            hover_color=CYBER_PINK,
             text_color=self.text_for_primary,
             font=("Arial", 22, "bold")
         )
@@ -423,7 +411,7 @@ class MainWindow(ctk.CTk):
             command=self.next_image,
             width=60,
             fg_color=CYBER_BLUE,
-            hover_color=CYBER_DBLUE,
+            hover_color=CYBER_BLUE,
             text_color=self.text_for_secondary,
             font=("Arial", 20, "bold")
         )
@@ -436,7 +424,7 @@ class MainWindow(ctk.CTk):
             command=self.next_block_actual,
             width=60,
             fg_color=CYBER_PURPLE,
-            hover_color=CYBER_VIOLET,
+            hover_color=CYBER_PURPLE,
             text_color=self.text_for_accent,
             font=("Arial", 20)
         )
@@ -449,20 +437,19 @@ class MainWindow(ctk.CTk):
             command=self.stop_session,
             width=140,
             fg_color=CYBER_PINK,
-            hover_color=CYBER_DPINK,
+            hover_color=CYBER_PINK,
             text_color=self.text_for_primary,
             font=("Arial", 13, "bold")
         )
         self.stop_button.pack(side="left", padx=5)
-
-        # Settings button
+        self._disable_button(self.stop_button)  # Disabled until session starts
         self.settings_button = ctk.CTkButton(
             self.button_frame,
             text="⚙",
             command=self.open_settings,
             width=60,
             fg_color=CYBER_GRAY,
-            hover_color=CYBER_ACCENT,
+            hover_color=CYBER_PURPLE,
             border_width=2,
             border_color=CYBER_BLUE,
             text_color=CYBER_TEXT,
@@ -478,28 +465,13 @@ class MainWindow(ctk.CTk):
             command=self.toggle_always_on_top,
             width=60,
             fg_color=CYBER_GRAY,
-            hover_color=CYBER_ACCENT,
+            hover_color=CYBER_PURPLE,
             border_width=2,
             border_color=CYBER_BLUE,
             text_color=CYBER_TEXT,
             font=("Arial", 18)
         )
         self.pin_button.pack(side="left", padx=5)
-
-        # Fullscreen button
-        self.fullscreen_button = ctk.CTkButton(
-            self.button_frame,
-            text="⛶",
-            command=self.toggle_fullscreen,
-            width=60,
-            fg_color=CYBER_GRAY,
-            hover_color=CYBER_ACCENT,
-            border_width=2,
-            border_color=CYBER_BLUE,
-            text_color=CYBER_TEXT,
-            font=("Arial", 18)
-        )
-        self.fullscreen_button.pack(side="left", padx=5)
 
         # Image display area
         self.image_frame = ctk.CTkFrame(self.main_container, fg_color=CYBER_DARK)
@@ -519,7 +491,6 @@ class MainWindow(ctk.CTk):
         self.image_canvas.bind("<Button-3>", self.show_image_context_menu)
         
         # Store canvas image reference
-        self.canvas_image_id = None
         self.canvas_image_ref = None
         self.current_image_path = None  # Track current image for tagging
     
@@ -536,13 +507,9 @@ class MainWindow(ctk.CTk):
         self.update_idletasks()
         
         # Play transition sound ONLY for automatic block transitions
-        # Always play on auto-advance, even if warning played
         if is_auto and block_index > 0:
             self.play_transition_sound()
-        
-        # Reset warning sound flag for new block
-        self.warning_sound_played = False
-        
+
         total_blocks = len(self.session_controller.session.blocks)
         
         current_duration = block.duration
@@ -631,10 +598,10 @@ class MainWindow(ctk.CTk):
         from theme_config import load_warnings
         warnings = load_warnings()
         
-        # Sort warnings by percentage (highest first) so we check from most urgent to least
+        # Sort warnings by percentage (highest first) so check from most urgent to least
         sorted_warnings = sorted(warnings, key=lambda w: w['percentage'])
         
-        # Determine which warning level we're in
+        # Determine which warning level in
         current_percentage = (remaining / block_duration) * 100
         
         # Find the appropriate warning
@@ -644,7 +611,7 @@ class MainWindow(ctk.CTk):
                 triggered_warning = warning
                 break
         
-        # Set timer color and play sound if we've entered a new warning zone
+        # Set timer color and play sound if entered a new warning zone
         if triggered_warning:
             # Get color - use custom color_hex if set, otherwise use theme color
             if 'color_hex' in triggered_warning and triggered_warning['color_hex']:
@@ -706,8 +673,9 @@ class MainWindow(ctk.CTk):
         self.folder_tag_label.configure(text="")
         self.pause_button.configure(text="⏸")
         
-        # Hide history button
-        self.history_button.pack_forget()
+        # Hide history and stop buttons, show start button
+        self._disable_button(self.history_button)
+        self._disable_button(self.stop_button)
         
         # Display completion message on canvas
         self.image_canvas.delete("all")
@@ -726,7 +694,12 @@ class MainWindow(ctk.CTk):
         self.progress_bar.set(1.0)
         
         # Show start button again
-        self.start_button.pack(side="left", padx=5, before=self.prev_block_button)
+        self._show_button(
+            self.start_button,
+            fg_color=self.theme["success"],
+            hover_color=self.theme["success"],
+            text_color=self.text_for_success
+        )
 
     def toggle_pause(self):
         """Pause or resume the session"""
@@ -745,14 +718,20 @@ class MainWindow(ctk.CTk):
         self.timer_label.configure(text="00:00")
         self.pause_button.configure(text="⏸")
         
-        # Hide history button
-        self.history_button.pack_forget()
+        # Hide history and stop buttons, show start button
+        self._disable_button(self.history_button)
+        self._disable_button(self.stop_button)
         
         # Reset progress bar
         self.progress_bar.set(0)
         
         # Show start button again
-        self.start_button.pack(side="left", padx=5, before=self.prev_block_button)
+        self._show_button(
+            self.start_button,
+            fg_color=self.theme["success"],
+            hover_color=self.theme["success"],
+            text_color=self.text_for_success
+        )
 
     def show_image_history(self):
         """Show dialog with all images from current block"""
@@ -767,13 +746,18 @@ class MainWindow(ctk.CTk):
         if current_block.block_type != "pose":
             return
         
-        # Get block start and current indices
+        # Get block start and end indices - show ALL images ever seen in this block
         block_start = self.session_controller.block_start_indices.get(current_block_idx, 0)
         current_idx = self.session_controller.current_image_index
         
-        # Get all images for this block (from start to current)
+        # Show everything from block start to the furthest image reached
+        furthest_idx = max(
+            self.session_controller.block_last_indices.get(current_block_idx, current_idx),
+            current_idx
+        )
+        
         block_images = []
-        for i in range(block_start, current_idx + 1):
+        for i in range(block_start, furthest_idx + 1):
             if i < len(self.session_controller.image_history):
                 img_path = self.session_controller.image_history[i]
                 if img_path:  # Skip None (break images)
@@ -782,8 +766,9 @@ class MainWindow(ctk.CTk):
         if not block_images:
             return
         
-        # Open history dialog
-        ImageHistoryDialog(self, block_images, current_idx - block_start)
+        # Pass current position within the block so dialog can highlight it
+        current_pos = current_idx - block_start
+        ImageHistoryDialog(self, block_images, current_pos)
     
     def open_settings(self):
         """Open settings dialog with keyboard shortcuts"""
@@ -847,13 +832,8 @@ class MainWindow(ctk.CTk):
                 print(f"Error playing warning sound: {e}")
         
         # Play in background thread
-        import threading
         threading.Thread(target=_play, daemon=True).start()
 
-    def play_warning_sound(self):
-        """Play default warning chime with volume control (kept for backward compatibility)"""
-        self.play_warning_sound_file("assets/bell.wav")
-    
     def play_transition_sound(self):
         """Play transition sound with volume control"""
         def _play():
@@ -983,7 +963,7 @@ class MainWindow(ctk.CTk):
         if '_nsfw' in filename.lower():
             return
         
-        # New filename with _nsfw (lowercase to match our filter logic)
+        # New filename with _nsfw (lowercase to match filter logic)
         new_filename = f"{filename}_nsfw{extension}"
         new_filepath = filepath.parent / new_filename
         
@@ -997,41 +977,22 @@ class MainWindow(ctk.CTk):
                 self.session_controller.current_block_index
             ]
             current_filter = current_block.nsfw_filter
-            print(f"[Tagging→NSFW] Current block filter: {current_filter}")
             
-            # Update used_images_in_session set
             if hasattr(self.session_controller, 'used_images_in_session'):
-                # Remove old path
                 if filepath in self.session_controller.used_images_in_session:
                     self.session_controller.used_images_in_session.remove(filepath)
-                
-                # Only add new path if it still matches current filter
-                # If we're in SFW block and just tagged as NSFW, don't add it back!
-                if current_filter == "all" or current_filter == "nsfw":
-                    # Will add after rename
-                    print(f"[Tagging→NSFW] Will keep in rotation (filter={current_filter})")
-                    pass
-                else:
-                    # SFW block, NSFW image - don't add to used set
-                    print(f"[Tagging] Image now NSFW, removing from SFW rotation")
-            
+
             filepath.rename(new_filepath)
             
             # Update image collection cache
             self.image_collection.refresh_file(filepath, new_filepath)
             
-            # Add new path to used set only if filter matches
+            # Add new path to used set, flag auto-advance if no longer valid for filter
             should_auto_advance = False
             if hasattr(self.session_controller, 'used_images_in_session'):
-                if current_filter == "all" or current_filter == "nsfw":
-                    self.session_controller.used_images_in_session.add(new_filepath)
-                    print(f"[Tagging→NSFW] Added to used set, no auto-advance")
-                else:
-                    # Current image no longer valid for this filter - auto-advance
-                    # IMPORTANT: Still add to used set to prevent re-selection
-                    self.session_controller.used_images_in_session.add(new_filepath)
+                self.session_controller.used_images_in_session.add(new_filepath)
+                if current_filter not in ("all", "nsfw"):
                     should_auto_advance = True
-                    print(f"[Tagging→NSFW] Added to used set (to prevent re-selection), will auto-advance!")
             
             # Update current path
             self.current_image_path = new_filepath
@@ -1045,7 +1006,6 @@ class MainWindow(ctk.CTk):
             
             # If image no longer matches filter, auto-advance to next valid image
             if should_auto_advance:
-                print(f"[Tagging] Auto-advancing to next valid image")
                 self.next_image()  # Automatically go to next image
             else:
                 # Refresh display immediately with new filename
@@ -1082,35 +1042,20 @@ class MainWindow(ctk.CTk):
             ]
             current_filter = current_block.nsfw_filter
             
-            # Update used_images_in_session set
             if hasattr(self.session_controller, 'used_images_in_session'):
-                # Remove old path
                 if filepath in self.session_controller.used_images_in_session:
                     self.session_controller.used_images_in_session.remove(filepath)
-                
-                # Only add new path if it still matches current filter
-                # If we're in NSFW block and just tagged as SFW, don't add it back!
-                if current_filter == "all" or current_filter == "sfw":
-                    # Will add after rename
-                    pass
-                else:
-                    # NSFW block, SFW image - don't add to used set
-                    print(f"[Tagging] Image now SFW, removing from NSFW rotation")
-            
+
             filepath.rename(new_filepath)
             
             # Update image collection cache
             self.image_collection.refresh_file(filepath, new_filepath)
             
-            # Add new path to used set only if filter matches
+            # Add new path to used set, flag auto-advance if no longer valid for filter
             should_auto_advance = False
             if hasattr(self.session_controller, 'used_images_in_session'):
-                if current_filter == "all" or current_filter == "sfw":
-                    self.session_controller.used_images_in_session.add(new_filepath)
-                else:
-                    # Current image no longer valid for this filter - auto-advance
-                    # IMPORTANT: Still add to used set to prevent re-selection
-                    self.session_controller.used_images_in_session.add(new_filepath)
+                self.session_controller.used_images_in_session.add(new_filepath)
+                if current_filter not in ("all", "sfw"):
                     should_auto_advance = True
             
             # Update current path
@@ -1125,7 +1070,6 @@ class MainWindow(ctk.CTk):
             
             # If image no longer matches filter, auto-advance to next valid image
             if should_auto_advance:
-                print(f"[Tagging] Auto-advancing to next valid image")
                 self.next_image()  # Automatically go to next image
             else:
                 # Refresh display immediately with new filename
@@ -1143,11 +1087,9 @@ class MainWindow(ctk.CTk):
         if self.is_fullscreen:
             self.attributes("-fullscreen", True)
             self.state('zoomed')  # Windows
-            self.fullscreen_button.configure(text="⛶ Exit")
         else:
             self.attributes("-fullscreen", False)
             self.state('normal')
-            self.fullscreen_button.configure(text="⛶ Full")
         
         self.update_idletasks()
     
@@ -1195,7 +1137,7 @@ class MainWindow(ctk.CTk):
         self.image_canvas.delete("all")
         x = canvas_width // 2
         y = canvas_height // 2
-        self.canvas_image_id = self.image_canvas.create_image(
+        self.image_canvas.create_image(
             x, y, image=self.canvas_image_ref, anchor="center"
         )
         
@@ -1232,7 +1174,7 @@ class MainWindow(ctk.CTk):
         self.image_canvas.delete("all")
         x = canvas_width // 2
         y = canvas_height // 2
-        self.canvas_image_id = self.image_canvas.create_image(
+        self.image_canvas.create_image(
             x, y, image=self.canvas_image_ref, anchor="center"
         )
         
@@ -1240,13 +1182,24 @@ class MainWindow(ctk.CTk):
 
     def start_session(self, session: Session):
         """Start any session (called by session selector or test button)"""
-        # Hide start button IMMEDIATELY before any heavy work
-        self.start_button.pack_forget()
+        # Hide start button, show stop button
+        self._disable_button(self.start_button)
+        self._show_button(
+            self.stop_button,
+            fg_color=self.theme["primary"],
+            hover_color=self.theme["primary"],
+            text_color=self.text_for_primary
+        )
         
         # Show history button
-        self.history_button.pack(side="left")
+        self._show_button(
+            self.history_button,
+            fg_color=self.theme["accent"],
+            hover_color=self.theme["primary"],
+            text_color=self.text_for_accent
+        )
         
-        # Force UI update so buttons disappear right away
+        # Force UI update so buttons update right away
         self.update_idletasks()
         
         # Now do the heavy work
@@ -1262,10 +1215,6 @@ class MainWindow(ctk.CTk):
         if session:
             self.start_session(session)
     
-    def on_session_selected(self, selected_session):
-        """Called when user picks a session from menu/dialog"""
-        self.start_session(selected_session)
-
     def start_test_session(self):
         """Start a test session for development - 1 Hr Class Mode"""
         blocks = []
@@ -1327,9 +1276,7 @@ class ImageHistoryDialog(ctk.CTkToplevel):
         CYBER_PINK = theme["primary"]
         CYBER_TEXT = theme["text"]
         
-        # Smart text colors
         TEXT_FOR_BLUE = get_text_color_for_bg(CYBER_BLUE)
-        TEXT_FOR_PINK = get_text_color_for_bg(CYBER_PINK)
         
         # Store theme for hover effects
         self.theme = theme
@@ -1446,10 +1393,14 @@ class ImageHistoryDialog(ctk.CTkToplevel):
         # Set the controller to this image
         self.parent_window.session_controller.current_image_index = absolute_index
         
-        # Update block's last index
-        self.parent_window.session_controller.block_last_indices[
-            self.parent_window.session_controller.current_block_index
-        ] = absolute_index
+        # Only update block_last_indices if jumping FORWARD (never shrink the furthest-reached tracker)
+        current_last = self.parent_window.session_controller.block_last_indices.get(
+            self.parent_window.session_controller.current_block_index, 0
+        )
+        if absolute_index > current_last:
+            self.parent_window.session_controller.block_last_indices[
+                self.parent_window.session_controller.current_block_index
+            ] = absolute_index
         
         # Get current block and image
         block = self.parent_window.session_controller.session.blocks[
@@ -1481,7 +1432,6 @@ class ImageHistoryDialog(ctk.CTkToplevel):
             self.parent_window.session_controller._stop_flag.set()
             self.parent_window.session_controller._stop_flag.clear()
         
-        import threading
         self.parent_window.session_controller._timer_thread = threading.Thread(
             target=self.parent_window.session_controller._timer_loop,
             args=(current_version,),

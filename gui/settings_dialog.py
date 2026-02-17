@@ -32,7 +32,7 @@ class SettingsDialog(ctk.CTkToplevel):
         from theme_config import get_theme, load_current_theme
         theme = get_theme(load_current_theme())
         
-        # Colors (match your theme)
+        # Colors (match theme)
         self.CYBER_PINK = theme["primary"]
         self.CYBER_PURPLE = theme["accent"]
         self.CYBER_BLUE = theme["secondary"]
@@ -535,10 +535,98 @@ class SettingsDialog(ctk.CTkToplevel):
         self.content_frame.pack(fill="both", expand=True, pady=(0, 15))
         
         # Recreate all sections
+        self.create_reference_folder_section()  # NEW: Add reference folder selector
         self.create_volume_section()
         self.create_theme_section()
         self.create_warnings_section()
         self.create_shortcuts_section()
+    
+    def create_reference_folder_section(self):
+        """Create reference folder selection section"""
+        import json
+        from pathlib import Path
+        from tkinter import filedialog
+        
+        folder_container = ctk.CTkFrame(self.content_frame, fg_color=self.CYBER_LIGHT_GRAY, corner_radius=8)
+        folder_container.pack(fill="x", padx=10, pady=10)
+        
+        # Header
+        folder_header = ctk.CTkLabel(
+            folder_container,
+            text="📁 Reference Folder",
+            font=("Arial", 14, "bold"),
+            text_color=self.CYBER_BLUE
+        )
+        folder_header.pack(pady=(10, 5), padx=10, anchor="w")
+        
+        # Load current folder
+        settings_file = Path("settings/app_settings.json")
+        current_folder = "Not set"
+        if settings_file.exists():
+            try:
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+                    ref_path = Path(settings.get('reference_folder', ''))
+                    if ref_path.exists():
+                        current_folder = str(ref_path)
+            except:
+                pass
+        
+        # Current folder display
+        self.folder_label = ctk.CTkLabel(
+            folder_container,
+            text=f"Current: {current_folder}",
+            font=("Arial", 11),
+            text_color=self.CYBER_TEXT,
+            wraplength=450,
+            anchor="w"
+        )
+        self.folder_label.pack(pady=5, padx=10, anchor="w")
+        
+        # Change folder button
+        change_folder_btn = ctk.CTkButton(
+            folder_container,
+            text="Change Folder",
+            command=self.change_reference_folder,
+            fg_color=self.CYBER_BLUE,
+            hover_color=self.CYBER_PURPLE,
+            text_color=self.CYBER_TEXT_SECONDARY,
+            width=150,
+            height=32
+        )
+        change_folder_btn.pack(pady=(5, 10), padx=10, anchor="w")
+    
+    def change_reference_folder(self):
+        """Open folder picker to change reference folder"""
+        import json
+        from pathlib import Path
+        from tkinter import filedialog, messagebox
+        
+        folder = filedialog.askdirectory(
+            title="Select Reference Images Folder",
+            mustexist=True
+        )
+        
+        if not folder:
+            return  # User cancelled
+        
+        ref_path = Path(folder)
+        
+        # Save to settings
+        settings_file = Path("settings/app_settings.json")
+        settings_file.parent.mkdir(exist_ok=True)
+        settings = {'reference_folder': str(ref_path)}
+        with open(settings_file, 'w') as f:
+            json.dump(settings, f, indent=2)
+        
+        # Update label
+        self.folder_label.configure(text=f"Current: {str(ref_path)}")
+        
+        messagebox.showinfo(
+            "Folder Changed",
+            "Reference folder updated!\nRestart the app for changes to take effect.",
+            parent=self
+        )
     
     def open_theme_editor(self):
         """Open theme editor to create new custom theme"""

@@ -4,7 +4,7 @@
 
 **A customizable figure drawing timer with smart session management**
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.2.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![Python](https://img.shields.io/badge/python-3.14-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
